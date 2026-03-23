@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Org Chart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #F7F4EE;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      color: #162416;
+    }
+
+    /* ─── TOOLBAR ─────────────────────────────────────────────────────── */
+    #toolbar {
+      height: 58px;
+      min-height: 58px;
+      background: #ffffff;
+      border-bottom: 1px solid #E3EDE3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.055);
+      flex-shrink: 0;
+    }
+
+    #brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #brand h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 21px;
+      font-weight: 400;
+      color: #162416;
+      letter-spacing: -0.3px;
+    }
+
+    #people-badge {
+      background: #CBF0D5;
+      color: #276147;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 11px;
+      border-radius: 20px;
+      letter-spacing: 0.1px;
+    }
+
+    #controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: #2D6A4F;
+      background: #fff;
+      border: 1.5px solid #95D4A8;
+      border-radius: 7px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .btn:hover  { background: #CBF0D5; border-color: #52B788; }
+    .btn:active { background: #B7E4C7; }
+
+    /* ─── CHART CANVAS ────────────────────────────────────────────────── */
+    #chart {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #chart svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    #chart svg:active { cursor: grabbing; }
+
+    /* ─── TREE ELEMENTS ───────────────────────────────────────────────── */
+    .link {
+      fill: none;
+      stroke: #A8D5B5;
+      stroke-width: 2px;
+    }
+
+    .node { cursor: pointer; }
+    .node.leaf { cursor: default; }
+
+    .node .card {
+      fill: #ffffff;
+      stroke: #C2E5CE;
+      stroke-width: 1.5px;
+    }
+
+    .node:hover .card {
+      stroke: #40916C;
+      filter: url(#glow);
+    }
+
+    .role-lbl {
+      font-family: 'DM Serif Display', serif;
+      font-size: 13px;
+      fill: #162416;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .name-lbl {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      fill: #5A8A68;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .badge-bg   { fill: #40916C; }
+    .badge-txt  {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      fill: #ffffff;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    /* ─── STATUS OVERLAY ──────────────────────────────────────────────── */
+    #status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: #F7F4EE;
+      z-index: 20;
+    }
+
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #C2E5CE;
+      border-top-color: #40916C;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #status .status-msg { color: #5A8A68; font-size: 14px; }
+
+    #status.error { gap: 10px; }
+    #status.error .err-icon { font-size: 40px; }
+    #status.error .err-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      color: #162416;
+    }
+    #status.error .err-body {
+      color: #5A8A68;
+      font-size: 13px;
+      text-align: center;
+      max-width: 520px;
+      line-height: 1.65;
+    }
+    #status.error code {
+      background: #E8E3D8;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-family: monospace;
+    }
+
+    /* ─── TOOLTIP ─────────────────────────────────────────────────────── */
+    #tooltip {
+      position: fixed;
+      background: rgba(18, 30, 18, 0.93);
+      backdrop-filter: blur(10px);
+      color: #ffffff;
+      font-size: 12.5px;
+      line-height: 1.55;
+      padding: 10px 14px;
+      border-radius: 9px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      z-index: 999;
+      max-width: 260px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+    }
+    #tooltip.show { opacity: 1; }
+    .tt-role   { font-weight: 600; font-size: 13px; }
+    .tt-name   { color: #95D4A8; margin-top: 3px; font-size: 12px; }
+    .tt-hidden {
+      color: #74C69D;
+      font-size: 11.5px;
+      margin-top: 7px;
+      padding-top: 7px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div id="brand">
+    <h1>Org Chart</h1>
+    <span id="people-badge">Loading&hellip;</span>
+  </div>
+  <div id="controls">
+    <button class="btn" onclick="expandAll()">Expand All</button>
+    <button class="btn" onclick="collapseAll()">Collapse All</button>
+    <button class="btn" onclick="resetView()">Reset View</button>
+  </div>
+</div>
+
+<div id="chart">
+  <div id="status">
+    <div class="spinner"></div>
+    <p class="status-msg">Loading org chart&hellip;</p>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  CONFIG  ← update this URL to your published Google Sheet CSV link
+// ═══════════════════════════════════════════════════════════════════
+const CSV_URL =
+  'https://docs.google.com/spreadsheets/d/1J9rEnKjzzHJc6m5PbVRWzNbllHITFWyt-3ZwzRBxslk/pub?output=csv';
+
+// ═══════════════════════════════════════════════════════════════════
+//  LAYOUT
+// ═══════════════════════════════════════════════════════════════════
+const NW  = 184;   // node width
+const NH  = 68;    // node height
+const HG  = 40;    // horizontal gap between siblings
+const VG  = 90;    // vertical gap between depth levels
+const DUR = 500;   // animation duration ms
+
+// ═══════════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════════
+let svg, g, zoom, root, treeLayout;
+let _uid = 0;
+
+// ═══════════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════════
+(async function init() {
+  try {
+    // ── fetch CSV ──────────────────────────────────────────────────
+    const raw = await d3.csv(CSV_URL, row => {
+      const get = key => {
+        const k = Object.keys(row).find(k => k.trim().toLowerCase() === key);
+        return k !== undefined ? (row[k] || '').trim() : '';
+      };
+      return {
+        id:     get('role'),
+        name:   get('name'),
+        parent: get('reports to') || null,
+      };
+    });
+
+    // ── deduplicate & filter blanks ────────────────────────────────
+    const seen = new Set();
+    const rows = raw.filter(r => {
+      if (!r.id || seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    if (rows.length === 0) throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
+
+    // ── remap orphan parents → null ────────────────────────────────
+    const roleSet = new Set(rows.map(r => r.id));
+    rows.forEach(r => { if (r.parent && !roleSet.has(r.parent)) r.parent = null; });
+
+    // ── handle multiple roots with a virtual root ──────────────────
+    const roots = rows.filter(r => !r.parent);
+    if (roots.length === 0) throw new Error('No root found. One row must have an empty "Reports To" field.');
+    const hasVirtual = roots.length > 1;
+    if (hasVirtual) {
+      rows.unshift({ id: '__ROOT__', name: '', parent: null });
+      roots.forEach(r => (r.parent = '__ROOT__'));
+    }
+
+    // ── build D3 hierarchy ─────────────────────────────────────────
+    root = d3.stratify().id(d => d.id).parentId(d => d.parent)(rows);
+    root.each(d => { d._uid = ++_uid; });
+
+    // ── collapse everything beyond depth 1 ─────────────────────────
+    root.each(d => {
+      if (d.depth >= 2 && d.children) {
+        d._children = d.children;
+        d.children  = null;
+      }
+    });
+
+    // ── update people count ────────────────────────────────────────
+    const total = rows.filter(r => r.id !== '__ROOT__').length;
+    document.getElementById('people-badge').textContent = `${total} people`;
+
+    // ── render ─────────────────────────────────────────────────────
+    setupSVG();
+    update(root, true);
+    setTimeout(fitView, 80);
+    document.getElementById('status').style.display = 'none';
+
+  } catch (err) {
+    showError(err);
+  }
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+//  SVG SETUP
+// ═══════════════════════════════════════════════════════════════════
+function setupSVG() {
+  svg = d3.select('#chart').append('svg');
+
+  const defs = svg.append('defs');
+
+  // Drop-shadow for nodes
+  const f = defs.append('filter').attr('id', 'shadow')
+    .attr('x', '-25%').attr('y', '-25%').attr('width', '150%').attr('height', '150%');
+  f.append('feDropShadow')
+    .attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4)
+    .attr('flood-color', 'rgba(0,0,0,0.10)');
+
+  // Hover glow
+  const g2 = defs.append('filter').attr('id', 'glow')
+    .attr('x', '-25%').attr('y', '-25%').attr('width', '150%').attr('height', '150%');
+  g2.append('feDropShadow')
+    .attr('dx', 0).attr('dy', 3).attr('stdDeviation', 6)
+    .attr('flood-color', 'rgba(64,145,108,0.25)');
+
+  g = svg.append('g').attr('class', 'root-g');
+
+  zoom = d3.zoom()
+    .scaleExtent([0.05, 4])
+    .on('zoom', e => g.attr('transform', e.transform));
+
+  svg.call(zoom).on('dblclick.zoom', null);
+
+  treeLayout = d3.tree().nodeSize([NW + HG, NH + VG]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  UPDATE / RENDER
+// ═══════════════════════════════════════════════════════════════════
+function update(source, instant) {
+  const dur = instant ? 0 : DUR;
+  treeLayout(root);
+
+  const nodes = root.descendants();
+  const links  = root.links();
+
+  // Prime starting positions for newly appearing nodes
+  nodes.forEach(d => {
+    if (d.x0 === undefined) { d.x0 = source.x0 ?? source.x ?? 0; }
+    if (d.y0 === undefined) { d.y0 = source.y0 ?? source.y ?? 0; }
+  });
+
+  // ── LINKS ──────────────────────────────────────────────────────
+  const link = g.selectAll('path.link').data(links, d => d.target._uid);
+
+  const linkEnter = link.enter().insert('path', 'g')
+    .attr('class', 'link')
+    .attr('d', () => bezier(
+      { x: source.x0 ?? source.x, y: source.y0 ?? source.y },
+      { x: source.x0 ?? source.x, y: source.y0 ?? source.y }
+    ));
+
+  link.merge(linkEnter)
+    .transition().duration(dur).ease(d3.easeCubicInOut)
+    .attr('d', d => bezier(d.source, d.target));
+
+  link.exit()
+    .transition().duration(dur).ease(d3.easeCubicInOut)
+    .attr('d', () => bezier(
+      { x: source.x, y: source.y },
+      { x: source.x, y: source.y }
+    ))
+    .remove();
+
+  // ── NODES ──────────────────────────────────────────────────────
+  const node = g.selectAll('g.node').data(nodes, d => d._uid);
+
+  const ne = node.enter().append('g')
+    .attr('class', 'node')
+    .attr('transform', () =>
+      `translate(${source.x0 ?? source.x},${source.y0 ?? source.y})`
+    )
+    .style('opacity', 0)
+    .on('click',     (_, d) => toggle(d))
+    .on('mouseover', showTip)
+    .on('mousemove', moveTip)
+    .on('mouseout',  hideTip);
+
+  // Card rectangle
+  ne.append('rect')
+    .attr('class', 'card')
+    .attr('x', -NW / 2).attr('y', -NH / 2)
+    .attr('width', NW).attr('height', NH)
+    .attr('rx', 10)
+    .attr('filter', 'url(#shadow)');
+
+  // Role label placeholder
+  ne.append('text').attr('class', 'role-lbl');
+  // Name label placeholder
+  ne.append('text').attr('class', 'name-lbl');
+
+  const nu = node.merge(ne);
+
+  // Animate to new positions
+  nu.transition().duration(dur).ease(d3.easeCubicInOut)
+    .attr('transform', d => `translate(${d.x},${d.y})`)
+    .style('opacity', 1);
+
+  // Class updates
+  nu.classed('leaf', d => !d.children && !d._children);
+
+  // Label updates
+  nu.each(function (d) {
+    const isVirtual = d.data.id === '__ROOT__';
+    const role = isVirtual ? 'Organization' : d.data.id;
+    const hasName = !!d.data.name && !isVirtual;
+    const sel = d3.select(this);
+
+    sel.select('.role-lbl')
+      .attr('y', hasName ? -13 : 0)
+      .text(clip(role, 22));
+
+    sel.select('.name-lbl')
+      .attr('y', hasName ? 12 : 0)
+      .text(hasName ? clip(d.data.name, 25) : '');
+  });
+
+  // Badges – rebuild every update
+  nu.selectAll('.badge').remove();
+  nu.filter(d => !!d._children).each(function (d) {
+    const n = totalDesc(d);
+    if (!n) return;
+    const label = `+${n}`;
+    const bw = Math.max(28, label.length * 7 + 14);
+    const bh = 18;
+    const bx = NW / 2 - bw - 3;   // right edge of card
+    const by = NH / 2 - bh - 3;   // bottom edge of card
+    const bg = d3.select(this).append('g').attr('class', 'badge')
+      .attr('transform', `translate(${bx},${by})`);
+    bg.append('rect').attr('class', 'badge-bg')
+      .attr('width', bw).attr('height', bh).attr('rx', 9);
+    bg.append('text').attr('class', 'badge-txt')
+      .attr('x', bw / 2).attr('y', bh / 2)
+      .text(label);
+  });
+
+  // Exit
+  node.exit()
+    .transition().duration(dur).ease(d3.easeCubicInOut)
+    .attr('transform', `translate(${source.x},${source.y})`)
+    .style('opacity', 0)
+    .remove();
+
+  // Stash positions
+  nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function bezier(s, t) {
+  const sy = s.y + NH / 2;
+  const ty = t.y - NH / 2;
+  const my = (sy + ty) / 2;
+  return `M${s.x},${sy} C${s.x},${my} ${t.x},${my} ${t.x},${ty}`;
+}
+
+function toggle(d) {
+  if (d._children) { d.children = d._children; d._children = null; }
+  else if (d.children) { d._children = d.children; d.children = null; }
+  update(d);
+}
+
+// Count ALL descendants (both visible and hidden) from this node
+function totalDesc(node) {
+  const kids = (node.children || []).concat(node._children || []);
+  return kids.reduce((s, c) => s + 1 + totalDesc(c), 0);
+}
+
+function clip(str, n) {
+  return str && str.length > n ? str.slice(0, n - 1) + '\u2026' : (str || '');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  FIT VIEW
+// ═══════════════════════════════════════════════════════════════════
+function fitView() {
+  if (!root) return;
+  treeLayout(root);
+  const nodes = root.descendants();
+  const xs = nodes.map(d => d.x);
+  const ys = nodes.map(d => d.y);
+  const x0 = Math.min(...xs) - NW / 2 - 24;
+  const x1 = Math.max(...xs) + NW / 2 + 24;
+  const y0 = Math.min(...ys) - NH / 2 - 24;
+  const y1 = Math.max(...ys) + NH / 2 + 40;
+  const W  = document.getElementById('chart').clientWidth;
+  const H  = document.getElementById('chart').clientHeight;
+  const sc = Math.min(1, 0.88 * Math.min(W / (x1 - x0), H / (y1 - y0)));
+  const tx = W / 2 - sc * ((x0 + x1) / 2);
+  const ty = H / 2 - sc * ((y0 + y1) / 2);
+  svg.transition().duration(DUR).ease(d3.easeCubicInOut)
+    .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(sc));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TOOLBAR ACTIONS
+// ═══════════════════════════════════════════════════════════════════
+function expandAll() {
+  if (!root) return;
+  root.each(d => {
+    if (d._children) { d.children = d._children; d._children = null; }
+  });
+  update(root);
+  setTimeout(fitView, DUR + 60);
+}
+
+function collapseAll() {
+  if (!root) return;
+  // Recursively collapse every node into _children
+  function deepCollapse(d) {
+    const kids = (d.children || []).concat(d._children || []);
+    if (kids.length) { d._children = kids; d.children = null; kids.forEach(deepCollapse); }
+  }
+  const topKids = (root.children || []).concat(root._children || []);
+  topKids.forEach(deepCollapse);
+  // Keep root's direct children visible (but each is collapsed)
+  if (root._children) { root.children = root._children; root._children = null; }
+  topKids.forEach(c => {
+    if (c.children && !c._children) { /* already set */ }
+    // children were already deep-collapsed above
+  });
+  update(root);
+}
+
+function resetView() {
+  if (!root) return;
+  // Expand/collapse the whole tree to show exactly depth 0 & 1
+  function resetNode(d, depth) {
+    const kids = (d.children || []).concat(d._children || []);
+    if (depth < 2) {
+      d.children  = kids.length ? kids : null;
+      d._children = null;
+    } else {
+      d._children = kids.length ? kids : null;
+      d.children  = null;
+    }
+    kids.forEach(c => resetNode(c, depth + 1));
+  }
+  resetNode(root, 0);
+  update(root);
+  setTimeout(fitView, DUR + 60);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TOOLTIP
+// ═══════════════════════════════════════════════════════════════════
+const tip = document.getElementById('tooltip');
+
+function showTip(event, d) {
+  const role   = d.data.id === '__ROOT__' ? 'Organization' : d.data.id;
+  const hidden = d._children ? totalDesc(d) : 0;
+  let html = `<div class="tt-role">${esc(role)}</div>`;
+  if (d.data.name) html += `<div class="tt-name">${esc(d.data.name)}</div>`;
+  if (hidden > 0)  html += `<div class="tt-hidden">+${hidden} hidden report${hidden !== 1 ? 's' : ''}</div>`;
+  tip.innerHTML = html;
+  tip.classList.add('show');
+  moveTip(event);
+}
+
+function moveTip(event) {
+  const pad = 14;
+  let x = event.clientX + pad;
+  let y = event.clientY - pad;
+  if (x + 280 > window.innerWidth)  x = event.clientX - 280 - pad;
+  if (y + 110 > window.innerHeight) y = event.clientY - 110 - pad;
+  tip.style.left = `${x}px`;
+  tip.style.top  = `${y}px`;
+}
+
+function hideTip() { tip.classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════════════
+//  ERROR DISPLAY
+// ═══════════════════════════════════════════════════════════════════
+function showError(err) {
+  console.error('[OrgChart]', err);
+  const isNetwork = /fetch|network|cors|403|failed to fetch/i.test(err.message || '');
+  const s = document.getElementById('status');
+  s.className = 'error';
+  s.innerHTML = `
+    <div class="err-icon">&#x26A0;&#xFE0F;</div>
+    <div class="err-title">Couldn't load the org chart</div>
+    <p class="err-body">${
+      isNetwork
+        ? `The Google Sheet isn't publicly accessible.<br>
+           In Google Sheets go to <strong>File &rarr; Share &rarr; Publish to web</strong>,
+           choose <em>Sheet 1</em> and <em>Comma-separated values (.csv)</em>,
+           click <strong>Publish</strong>, copy the URL, and update
+           <code>CSV_URL</code> at the top of <code>index.html</code>.`
+        : esc(err.message)
+    }</p>
+  `;
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+</script>
+</body>
+</html>
