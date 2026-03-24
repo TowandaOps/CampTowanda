@@ -121,7 +121,7 @@
 
     .role-lbl {
       font-family: 'DM Serif Display', serif;
-      font-size: 13px;
+      font-size: 15px;
       fill: #162416;
       text-anchor: middle;
       dominant-baseline: middle;
@@ -130,7 +130,7 @@
 
     .name-lbl {
       font-family: 'DM Sans', sans-serif;
-      font-size: 11px;
+      font-size: 12px;
       fill: #5A8A68;
       text-anchor: middle;
       dominant-baseline: middle;
@@ -257,11 +257,12 @@ const CSV_URL =
 
 // ═══════════════════════════════════════════════════════════════════
 //  LAYOUT
+//  Narrower, taller cards + tight sibling gap = more vertical feel
 // ═══════════════════════════════════════════════════════════════════
-const NW  = 184;
-const NH  = 68;
-const HG  = 40;
-const VG  = 90;
+const NW  = 155;   // card width
+const NH  = 76;    // card height (taller than before)
+const HG  = 22;    // horizontal gap between siblings (tight)
+const VG  = 80;    // vertical gap between levels
 const DUR = 500;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -374,6 +375,7 @@ function update(source, instant) {
     if (d.y0 === undefined) { d.y0 = source.y0 ?? source.y ?? 0; }
   });
 
+  // ── LINKS ──────────────────────────────────────────────────────
   const link = g.selectAll('path.link').data(links, d => d.target._uid);
 
   const linkEnter = link.enter().insert('path', 'g')
@@ -395,6 +397,7 @@ function update(source, instant) {
     ))
     .remove();
 
+  // ── NODES ──────────────────────────────────────────────────────
   const node = g.selectAll('g.node').data(nodes, d => d._uid);
 
   const ne = node.enter().append('g')
@@ -431,20 +434,21 @@ function update(source, instant) {
     const role = isVirtual ? 'Organization' : d.data.id;
     const hasName = !!d.data.name && !isVirtual;
     const sel = d3.select(this);
-    sel.select('.role-lbl').attr('y', hasName ? -13 : 0).text(clip(role, 22));
-    sel.select('.name-lbl').attr('y', hasName ? 12 : 0).text(hasName ? clip(d.data.name, 25) : '');
+    sel.select('.role-lbl').attr('y', hasName ? -16 : 0).text(clip(role, 18));
+    sel.select('.name-lbl').attr('y', hasName ?  14 : 0).text(hasName ? clip(d.data.name, 21) : '');
   });
 
+  // Badges
   nu.selectAll('.badge').remove();
   nu.filter(d => !!d._children).each(function (d) {
     const n = totalDesc(d);
     if (!n) return;
     const label = `+${n}`;
-    const bw = Math.max(28, label.length * 7 + 14);
-    const bh = 18;
+    const bw = Math.max(26, label.length * 7 + 12);
+    const bh = 17;
     const bg = d3.select(this).append('g').attr('class', 'badge')
-      .attr('transform', `translate(${NW / 2 - bw - 3},${NH / 2 - bh - 3})`);
-    bg.append('rect').attr('class', 'badge-bg').attr('width', bw).attr('height', bh).attr('rx', 9);
+      .attr('transform', `translate(${NW / 2 - bw - 4},${NH / 2 - bh - 4})`);
+    bg.append('rect').attr('class', 'badge-bg').attr('width', bw).attr('height', bh).attr('rx', 8);
     bg.append('text').attr('class', 'badge-txt').attr('x', bw / 2).attr('y', bh / 2).text(label);
   });
 
