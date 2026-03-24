@@ -626,7 +626,7 @@ function update(source, instant) {
     const bw    = Math.max(26, label.length * 7 + 12);
     const bh    = 17;
     const bg    = d3.select(this).append('g').attr('class', 'badge')
-      .attr('transform', `translate(${cw / 2 - bw - 4},${ch / 2 - bh - 4})`);
+      .attr('transform', `translate(${cw / 2 - bw - 4},${-ch / 2 + 4})`);
     bg.append('rect').attr('class', 'badge-bg').attr('width', bw).attr('height', bh).attr('rx', 8);
     bg.append('text').attr('class', 'badge-txt').attr('x', bw / 2).attr('y', bh / 2).text(label);
   });
