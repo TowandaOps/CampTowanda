@@ -280,6 +280,7 @@ const DIST_H  = 14;
 const PERSON_GAP = 8;
 const TEXT_PAD_X = 14;
 const HG      = 3;
+const SUBTREE_GAP = 28;
 const LEVEL_GAP = 10;
 const BUS_CLEARANCE = 5;
 const BUS_MIN_STEM = 7;
@@ -659,7 +660,7 @@ function compactSubtrees(node) {
   for (let i = 1; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const targetMin = left.max + HG;
+    const targetMin = left.max + SUBTREE_GAP;
     const shift = targetMin - right.min;
     if (shift !== 0) shiftSubtree(children[i], shift);
   }
@@ -667,7 +668,7 @@ function compactSubtrees(node) {
   for (let i = 2; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const targetMin = left.max + HG;
+    const targetMin = left.max + SUBTREE_GAP;
     const shift = targetMin - right.min;
     if (shift > 0) shiftSubtree(children[i], shift);
   }
