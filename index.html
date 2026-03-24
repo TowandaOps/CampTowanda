@@ -590,13 +590,15 @@ function update(source, instant) {
     layout.people.forEach(({ person, topY }) => {
       const block = sel.append('g').attr('class', 'person-block');
       const housing = housingCode(person.housing);
+      const isOpen = (person.name || 'OPEN') === 'OPEN';
       const nameText = block.append('text')
-        .attr('class', `name-lbl${(person.name || 'OPEN') === 'OPEN' ? ' name-open' : ''}`)
+        .attr('class', 'name-lbl')
         .attr('x', 0)
         .attr('y', topY)
         .attr('text-anchor', 'middle');
 
       nameText.append('tspan')
+        .attr('class', isOpen ? 'name-open' : null)
         .text(person.name || 'OPEN');
 
       if (housing) {
