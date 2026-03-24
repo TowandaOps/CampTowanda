@@ -134,6 +134,8 @@
       font-size: 14px;
       font-weight: 600;
       fill: #5A8A68;
+      text-anchor: middle;
+      dominant-baseline: hanging;
       pointer-events: none;
     }
 
@@ -141,6 +143,8 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 12px;
       fill: #000000;
+      text-anchor: middle;
+      dominant-baseline: hanging;
       pointer-events: none;
     }
 
@@ -555,22 +559,18 @@ function update(source, instant) {
 
     layout.people.forEach(({ person, topY }) => {
       const block = sel.append('g').attr('class', 'person-block');
-      const text = block.append('text')
-        .attr('x', 0)
-        .attr('y', topY)
-        .attr('text-anchor', 'middle');
 
-      text.append('tspan')
+      block.append('text')
         .attr('class', 'name-lbl')
         .attr('x', 0)
-        .attr('dy', '1em')
+        .attr('y', topY)
         .text(person.name || 'OPEN');
 
       if (person.distinction) {
-        text.append('tspan')
+        block.append('text')
           .attr('class', 'dist-lbl')
           .attr('x', 0)
-          .attr('dy', '1.2em')
+          .attr('y', topY + NAME_H + 4)
           .text(`(${person.distinction})`);
       }
     });
