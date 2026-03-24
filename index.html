@@ -134,8 +134,6 @@
       font-size: 14px;
       font-weight: 600;
       fill: #5A8A68;
-      text-anchor: middle;
-      dominant-baseline: middle;
       pointer-events: none;
     }
 
@@ -143,8 +141,6 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 12px;
       fill: #000000;
-      text-anchor: middle;
-      dominant-baseline: middle;
       pointer-events: none;
     }
 
@@ -322,10 +318,9 @@ function cardLayout(d) {
   let cursorY = divY + 12;
   const lines = people.map(person => {
     const blockH = NAME_H + (person.distinction ? DIST_H + 4 : 0);
-    const nameY = cursorY + NAME_H / 2;
-    const distinctionY = person.distinction ? cursorY + NAME_H + 4 + DIST_H / 2 : null;
+    const topY = cursorY;
     cursorY += blockH + PERSON_GAP;
-    return { person, nameY, distinctionY };
+    return { person, topY };
   });
 
   return { roleY, divY, people: lines };
@@ -558,18 +553,24 @@ function update(source, instant) {
         .attr('y1', layout.divY).attr('y2', layout.divY);
     }
 
-    layout.people.forEach(({ person, nameY, distinctionY }) => {
+    layout.people.forEach(({ person, topY }) => {
       const block = sel.append('g').attr('class', 'person-block');
-
-      block.append('text').attr('class', 'name-lbl')
+      const text = block.append('text')
         .attr('x', 0)
-        .attr('y', nameY)
-        .text(person.name || '');
+        .attr('y', topY)
+        .attr('text-anchor', 'middle');
 
-      if (distinctionY !== null) {
-        block.append('text').attr('class', 'dist-lbl')
+      text.append('tspan')
+        .attr('class', 'name-lbl')
+        .attr('x', 0)
+        .attr('dy', '1em')
+        .text(person.name || 'OPEN');
+
+      if (person.distinction) {
+        text.append('tspan')
+          .attr('class', 'dist-lbl')
           .attr('x', 0)
-          .attr('y', distinctionY)
+          .attr('dy', '1.2em')
           .text(`(${person.distinction})`);
       }
     });
