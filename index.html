@@ -148,6 +148,9 @@
       pointer-events: none;
     }
 
+    .housing-boy { fill: #2563EB; }
+    .housing-girl { fill: #DC2626; }
+
     .name-div {
       stroke: #E3EDE3;
       stroke-width: 1;
@@ -307,7 +310,7 @@ function cardW(d) {
   const widest = Math.max(
     estimateRoleWidth(role),
     ...people.flatMap(person => [
-      estimateNameWidth(person.name || ''),
+      estimateNameWidth(person.name || '') + estimateHousingWidth(person.housing),
       person.distinction ? estimateDistWidth(`(${person.distinction})`) : 0,
     ]),
   );
@@ -353,6 +356,10 @@ function estimateDistWidth(text) {
   return text.length * 7.2;
 }
 
+function estimateHousingWidth(housing) {
+  return housingCode(housing) ? 14 : 0;
+}
+
 function firstName(name) {
   return (name || '').trim().split(/\s+/)[0] || '';
 }
@@ -361,6 +368,18 @@ function comparePeople(a, b) {
   return (a.distinction || '\uffff').localeCompare(b.distinction || '\uffff')
     || firstName(a.name).localeCompare(firstName(b.name))
     || (a.name || '').localeCompare(b.name || '');
+}
+
+function housingCode(housing) {
+  if (housing === 'Boy') return 'B';
+  if (housing === 'Girl') return 'G';
+  return '';
+}
+
+function housingClass(housing) {
+  if (housing === 'Boy') return 'housing-boy';
+  if (housing === 'Girl') return 'housing-girl';
+  return '';
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -380,6 +399,7 @@ let _uid = 0;
         return k !== undefined ? (row[k] || '').trim() : '';
       };
       return {
+        housing: get('housing'),
         role: get('role'),
         name: get('name'),
         parent: get('reports to') || null,
@@ -393,6 +413,7 @@ let _uid = 0;
       if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, people: [] });
       groupMap.get(key).people.push({
         name: r.name || 'OPEN',
+        housing: r.housing || '',
         distinction: r.distinction || '',
       });
     });
@@ -564,12 +585,28 @@ function update(source, instant) {
 
     layout.people.forEach(({ person, topY }) => {
       const block = sel.append('g').attr('class', 'person-block');
+      const name = person.name || 'OPEN';
+      const housing = housingCode(person.housing);
+      const housingGap = housing ? 4 : 0;
+      const nameWidth = estimateNameWidth(name);
+      const housingWidth = housing ? estimateHousingWidth(person.housing) - housingGap : 0;
+      const totalWidth = nameWidth + housingGap + housingWidth;
 
       block.append('text')
         .attr('class', 'name-lbl')
-        .attr('x', 0)
+        .attr('x', housing ? -(totalWidth / 2) : 0)
         .attr('y', topY)
-        .text(person.name || 'OPEN');
+        .attr('text-anchor', housing ? 'start' : 'middle')
+        .text(name);
+
+      if (housing) {
+        block.append('text')
+          .attr('class', `name-lbl ${housingClass(person.housing)}`)
+          .attr('x', -totalWidth / 2 + nameWidth + housingGap)
+          .attr('y', topY)
+          .attr('text-anchor', 'start')
+          .text(housing);
+      }
 
       if (person.distinction) {
         block.append('text')
