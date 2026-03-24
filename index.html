@@ -700,19 +700,19 @@ function applyDepthSpacing(rootNode) {
   });
 
   const depths = [...levels.keys()].sort((a, b) => a - b);
-  let y = 0;
+  let topY = 0;
 
   depths.forEach((depth, index) => {
     const nodes = levels.get(depth);
-    const maxHalf = Math.max(...nodes.map(node => cardH(node) / 2));
+    const maxHeight = Math.max(...nodes.map(node => cardH(node)));
 
     if (index > 0) {
       const prevNodes = levels.get(depths[index - 1]);
-      const prevHalf = Math.max(...prevNodes.map(node => cardH(node) / 2));
-      y += prevHalf + maxHalf + LEVEL_GAP;
+      const prevMaxHeight = Math.max(...prevNodes.map(node => cardH(node)));
+      topY += prevMaxHeight + LEVEL_GAP;
     }
 
-    nodes.forEach(node => { node.y = y; });
+    nodes.forEach(node => { node.y = topY + cardH(node) / 2; });
   });
 }
 
