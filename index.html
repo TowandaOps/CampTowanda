@@ -363,7 +363,11 @@ function firstName(name) {
 }
 
 function comparePeople(a, b) {
-  return (a.distinction || '\uffff').localeCompare(b.distinction || '\uffff')
+  const aIsDirector = (a.distinction || '').trim().toLowerCase() === 'director';
+  const bIsDirector = (b.distinction || '').trim().toLowerCase() === 'director';
+
+  return Number(bIsDirector) - Number(aIsDirector)
+    || (a.distinction || '\uffff').localeCompare(b.distinction || '\uffff')
     || firstName(a.name).localeCompare(firstName(b.name))
     || (a.name || '').localeCompare(b.name || '');
 }
