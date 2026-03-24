@@ -676,9 +676,11 @@ function collapsedBus(node) {
 }
 
 function toggle(d) {
+  const opening = !!d._children;
   if (d._children) { d.children = d._children; d._children = null; }
   else if (d.children) { d._children = d.children; d.children = null; }
   update(d);
+  if (opening) setTimeout(() => focusExpandedCard(d), DUR + 60);
 }
 
 function totalPersonDesc(node) {
@@ -774,6 +776,25 @@ function fitView() {
   svg.transition().duration(DUR).ease(d3.easeCubicInOut)
     .call(zoom.transform, d3.zoomIdentity
       .translate(W / 2 - sc * (x0 + x1) / 2, H / 2 - sc * (y0 + y1) / 2)
+      .scale(sc));
+}
+
+function focusExpandedCard(node) {
+  if (!root || !svg) return;
+
+  const reports = node.children && node.children.length ? node.children : [node];
+  const x0 = Math.min(...reports.map(d => d.x - cardW(d) / 2)) - 24;
+  const x1 = Math.max(...reports.map(d => d.x + cardW(d) / 2)) + 24;
+
+  const W = document.getElementById('chart').clientWidth;
+  const H = document.getElementById('chart').clientHeight;
+  const topPad = 28;
+  const sc = Math.min(1, 0.92 * (W / Math.max(1, x1 - x0)));
+  const cardTop = node.y - cardH(node) / 2;
+
+  svg.transition().duration(DUR).ease(d3.easeCubicInOut)
+    .call(zoom.transform, d3.zoomIdentity
+      .translate(W / 2 - sc * node.x, topPad - sc * cardTop)
       .scale(sc));
 }
 
