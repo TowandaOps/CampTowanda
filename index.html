@@ -658,15 +658,17 @@ function compactSubtrees(node) {
   for (let i = 1; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const overlap = left.max + HG - right.min;
-    if (overlap > 0) shiftSubtree(children[i], overlap);
+    const targetMin = left.max + HG;
+    const shift = targetMin - right.min;
+    if (shift !== 0) shiftSubtree(children[i], shift);
   }
 
   for (let i = 2; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const overlap = left.max + HG - right.min;
-    if (overlap > 0) shiftSubtree(children[i], overlap);
+    const targetMin = left.max + HG;
+    const shift = targetMin - right.min;
+    if (shift > 0) shiftSubtree(children[i], shift);
   }
 
   node.x = (children[0].x + children[children.length - 1].x) / 2;
