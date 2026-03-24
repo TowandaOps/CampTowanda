@@ -681,10 +681,11 @@ function collapsedBus(node) {
 
 function toggle(d) {
   const opening = !!d._children;
+  const focusTarget = opening ? d : (d.parent || d);
   if (d._children) { d.children = d._children; d._children = null; }
   else if (d.children) { d._children = d.children; d.children = null; }
   update(d);
-  if (opening) setTimeout(() => focusExpandedCard(d), DUR + 60);
+  setTimeout(() => focusExpandedCard(focusTarget), DUR + 60);
 }
 
 function totalPersonDesc(node) {
