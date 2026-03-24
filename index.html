@@ -363,10 +363,12 @@ function firstName(name) {
 }
 
 function comparePeople(a, b) {
-  const aIsDirector = /\bdirector\b/i.test(a.distinction || '');
-  const bIsDirector = /\bdirector\b/i.test(b.distinction || '');
+  const aDist = (a.distinction || '').trim();
+  const bDist = (b.distinction || '').trim();
+  const aDirectorRank = /^director$/i.test(aDist) ? 2 : (/\bdirector\b/i.test(aDist) ? 1 : 0);
+  const bDirectorRank = /^director$/i.test(bDist) ? 2 : (/\bdirector\b/i.test(bDist) ? 1 : 0);
 
-  return Number(bIsDirector) - Number(aIsDirector)
+  return bDirectorRank - aDirectorRank
     || (a.distinction || '\uffff').localeCompare(b.distinction || '\uffff')
     || firstName(a.name).localeCompare(firstName(b.name))
     || (a.name || '').localeCompare(b.name || '');
