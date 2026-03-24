@@ -139,6 +139,8 @@
       pointer-events: none;
     }
 
+    .name-open { fill: #D97706; }
+
     .dist-lbl {
       font-family: 'DM Sans', sans-serif;
       font-size: 12px;
@@ -589,7 +591,7 @@ function update(source, instant) {
       const block = sel.append('g').attr('class', 'person-block');
       const housing = housingCode(person.housing);
       const nameText = block.append('text')
-        .attr('class', 'name-lbl')
+        .attr('class', `name-lbl${(person.name || 'OPEN') === 'OPEN' ? ' name-open' : ''}`)
         .attr('x', 0)
         .attr('y', topY)
         .attr('text-anchor', 'middle');
