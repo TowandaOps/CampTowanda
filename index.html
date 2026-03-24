@@ -310,7 +310,7 @@ function cardW(d) {
   const widest = Math.max(
     estimateRoleWidth(role),
     ...people.flatMap(person => [
-      estimateNameWidth(person.name || '') + estimateHousingWidth(person.housing),
+      estimateNameWidth(displayName(person)),
       person.distinction ? estimateDistWidth(`(${person.distinction})`) : 0,
     ]),
   );
@@ -356,10 +356,6 @@ function estimateDistWidth(text) {
   return text.length * 7.2;
 }
 
-function estimateHousingWidth(housing) {
-  return housingCode(housing) ? 14 : 0;
-}
-
 function firstName(name) {
   return (name || '').trim().split(/\s+/)[0] || '';
 }
@@ -380,6 +376,12 @@ function housingClass(housing) {
   if (housing === 'Boy') return 'housing-boy';
   if (housing === 'Girl') return 'housing-girl';
   return '';
+}
+
+function displayName(person) {
+  const name = person.name || 'OPEN';
+  const housing = housingCode(person.housing);
+  return housing ? `${name} ${housing}` : name;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -585,26 +587,22 @@ function update(source, instant) {
 
     layout.people.forEach(({ person, topY }) => {
       const block = sel.append('g').attr('class', 'person-block');
-      const name = person.name || 'OPEN';
       const housing = housingCode(person.housing);
-      const housingGap = housing ? 4 : 0;
-      const nameWidth = estimateNameWidth(name);
-      const housingWidth = housing ? estimateHousingWidth(person.housing) - housingGap : 0;
-      const totalWidth = nameWidth + housingGap + housingWidth;
-
-      block.append('text')
+      const nameText = block.append('text')
         .attr('class', 'name-lbl')
-        .attr('x', housing ? -(totalWidth / 2) : 0)
+        .attr('x', 0)
         .attr('y', topY)
-        .attr('text-anchor', housing ? 'start' : 'middle')
-        .text(name);
+        .attr('text-anchor', 'middle');
+
+      nameText.append('tspan')
+        .text(person.name || 'OPEN');
 
       if (housing) {
-        block.append('text')
-          .attr('class', `name-lbl ${housingClass(person.housing)}`)
-          .attr('x', -totalWidth / 2 + nameWidth + housingGap)
-          .attr('y', topY)
-          .attr('text-anchor', 'start')
+        nameText.append('tspan')
+          .text(' ');
+
+        nameText.append('tspan')
+          .attr('class', housingClass(person.housing))
           .text(housing);
       }
 
