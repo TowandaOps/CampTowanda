@@ -280,7 +280,7 @@ const DIST_H  = 14;
 const PERSON_GAP = 8;
 const TEXT_PAD_X = 18;
 const HG      = 15;
-const VG      = 56;
+const LEVEL_GAP = 26;
 const DUR     = 500;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -466,7 +466,7 @@ function setupSVG() {
   zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', e => g.attr('transform', e.transform));
   svg.call(zoom).on('dblclick.zoom', null);
 
-  treeLayout = d3.tree().nodeSize([MIN_CARD_W + HG, NH_MIN + VG]);
+  treeLayout = d3.tree().nodeSize([MIN_CARD_W + HG, NH_MIN + LEVEL_GAP]);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -481,8 +481,9 @@ function update(source, instant) {
     maxCardH = Math.max(maxCardH, cardH(d));
     maxCardW = Math.max(maxCardW, cardW(d));
   });
-  treeLayout.nodeSize([maxCardW + HG, maxCardH + VG]);
+  treeLayout.nodeSize([maxCardW + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
+  applyDepthSpacing(root);
 
   const nodes = root.descendants();
   const links = nodes.filter(d => (d.children || []).length > 0);
@@ -646,6 +647,31 @@ function totalPersonDesc(node) {
   return kids.reduce((s, c) => s + nodePersonCount(c) + totalPersonDesc(c), 0);
 }
 
+function applyDepthSpacing(rootNode) {
+  const levels = new Map();
+
+  rootNode.each(node => {
+    if (!levels.has(node.depth)) levels.set(node.depth, []);
+    levels.get(node.depth).push(node);
+  });
+
+  const depths = [...levels.keys()].sort((a, b) => a - b);
+  let y = 0;
+
+  depths.forEach((depth, index) => {
+    const nodes = levels.get(depth);
+    const maxHalf = Math.max(...nodes.map(node => cardH(node) / 2));
+
+    if (index > 0) {
+      const prevNodes = levels.get(depths[index - 1]);
+      const prevHalf = Math.max(...prevNodes.map(node => cardH(node) / 2));
+      y += prevHalf + maxHalf + LEVEL_GAP;
+    }
+
+    nodes.forEach(node => { node.y = y; });
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  FIT VIEW
 // ═══════════════════════════════════════════════════════════════════
@@ -657,8 +683,9 @@ function fitView() {
     maxCardH = Math.max(maxCardH, cardH(d));
     maxCardW = Math.max(maxCardW, cardW(d));
   });
-  treeLayout.nodeSize([maxCardW + HG, maxCardH + VG]);
+  treeLayout.nodeSize([maxCardW + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
+  applyDepthSpacing(root);
 
   const nodes = root.descendants();
   const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
