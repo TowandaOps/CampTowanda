@@ -487,6 +487,7 @@ function update(source, instant) {
   treeLayout(root);
   applyDepthSpacing(root);
   compactSubtrees(root);
+  alignLevelTops(root);
 
   const nodes = root.descendants();
   const links = nodes.filter(d => (d.children || []).length > 0);
@@ -674,6 +675,22 @@ function compactSubtrees(node) {
   node.x = (children[0].x + children[children.length - 1].x) / 2;
 }
 
+function alignLevelTops(rootNode) {
+  const levels = new Map();
+
+  rootNode.each(node => {
+    if (!levels.has(node.depth)) levels.set(node.depth, []);
+    levels.get(node.depth).push(node);
+  });
+
+  levels.forEach(nodes => {
+    const topY = Math.min(...nodes.map(node => node.y - cardH(node) / 2));
+    nodes.forEach(node => {
+      node.y = topY + cardH(node) / 2;
+    });
+  });
+}
+
 function subtreeExtent(node) {
   let min = Infinity;
   let max = -Infinity;
@@ -731,6 +748,7 @@ function fitView() {
   treeLayout(root);
   applyDepthSpacing(root);
   compactSubtrees(root);
+  alignLevelTops(root);
 
   const nodes = root.descendants();
   const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
