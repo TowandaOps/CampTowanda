@@ -284,6 +284,7 @@ const LEVEL_GAP = 10;
 const BUS_CLEARANCE = 5;
 const BUS_MIN_STEM = 7;
 const DUR     = 500;
+const MIN_VERTICAL_LINE = NH_MIN / 2;
 
 // ═══════════════════════════════════════════════════════════════════
 //  CARD GEOMETRY
@@ -726,7 +727,7 @@ function applyDepthSpacing(rootNode) {
     if (index > 0) {
       const prevNodes = levels.get(depths[index - 1]);
       const prevMaxHeight = Math.max(...prevNodes.map(node => cardH(node)));
-      topY += prevMaxHeight + LEVEL_GAP;
+      topY += prevMaxHeight + Math.max(LEVEL_GAP, MIN_VERTICAL_LINE);
     }
 
     nodes.forEach(node => { node.y = topY + cardH(node) / 2; });
