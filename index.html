@@ -459,7 +459,8 @@ let _uid = 0;
     root.each(d => { d._uid = ++_uid; });
 
     root.each(d => {
-      if (d.depth >= 1 && d.children) { d._children = d.children; d.children = null; }
+      const visibleDepth = root.data.uid === '__ROOT__' ? d.depth - 1 : d.depth;
+      if (visibleDepth >= 1 && d.children) { d._children = d.children; d.children = null; }
     });
 
     const total = rows
