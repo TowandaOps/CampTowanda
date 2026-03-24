@@ -137,6 +137,12 @@
       pointer-events: none;
     }
 
+    /* Thin divider line between role and names on multi-person cards */
+    .name-div {
+      stroke: #E3EDE3;
+      stroke-width: 1;
+    }
+
     .badge-bg   { fill: #40916C; }
     .badge-txt  {
       font-family: 'DM Sans', sans-serif;
@@ -249,20 +255,55 @@
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  CONFIG
-//  No publishing needed — just share the sheet as "Anyone with the
-//  link can view" and this URL will always serve the latest data.
 // ═══════════════════════════════════════════════════════════════════
 const CSV_URL =
   'https://docs.google.com/spreadsheets/d/1J9rEnKjzzHJc6m5PbVRWzNbllHITFWyt-3ZwzRBxslk/gviz/tq?tqx=out:csv';
 
 // ═══════════════════════════════════════════════════════════════════
-//  LAYOUT
+//  LAYOUT CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
-const NW  = 155;   // card width
-const NH  = 76;    // card height
-const HG  = 22;    // horizontal gap between siblings
-const VG  = 80;    // vertical gap between levels
-const DUR = 500;
+const NW      = 155;  // card width
+const NH_MIN  = 76;   // minimum card height (0 or 1 name)
+const NAME_H  = 18;   // px per additional name row
+const HG      = 22;   // horizontal gap between siblings
+const VG      = 80;   // vertical gap between levels
+const DUR     = 500;
+
+// ═══════════════════════════════════════════════════════════════════
+//  CARD GEOMETRY  (all height-related math lives here)
+// ═══════════════════════════════════════════════════════════════════
+// Returns the pixel height of a node's card.
+function cardH(d) {
+  const n = nodePersonCount(d);
+  if (n <= 1) return NH_MIN;
+  // extra rows beyond the first
+  return NH_MIN + (n - 1) * NAME_H;
+}
+
+// Returns { roleY, divY, nameYs[] } — all relative to card center (0,0).
+function cardLayout(d) {
+  const names = (d.data.names || []);
+  const n     = names.length;
+  const ch    = cardH(d);
+
+  if (n === 0) return { roleY: 0, divY: null, nameYs: [] };
+  if (n === 1) return { roleY: -17, divY: null, nameYs: [16] };
+
+  // Multi-person: role header + divider + stacked names
+  // role sits in the top portion of the card
+  const roleAreaH = 34;                        // px reserved for role label
+  const roleY     = -ch / 2 + roleAreaH / 2;  // center of role area
+  const divY      = -ch / 2 + roleAreaH;      // divider line y
+  const namesTop  = divY + NAME_H / 2 + 2;    // center of first name
+  const nameYs    = names.map((_, i) => namesTop + i * NAME_H);
+  return { roleY, divY, nameYs };
+}
+
+// How many people this node represents (≥1 for empty roles = unfilled position)
+function nodePersonCount(d) {
+  const names = (d.data.names || []);
+  return Math.max(1, names.length);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  STATE
@@ -280,34 +321,38 @@ let _uid = 0;
         const k = Object.keys(row).find(k => k.trim().toLowerCase() === key);
         return k !== undefined ? (row[k] || '').trim() : '';
       };
-      return {
-        role:   get('role'),
-        name:   get('name'),
-        parent: get('reports to') || null,
-      };
+      return { role: get('role'), name: get('name'), parent: get('reports to') || null };
     });
 
-    // Assign a unique uid to every row so duplicate role names are allowed.
-    // The first occurrence of a role keeps the role name as its uid;
-    // subsequent duplicates get role__2, role__3, etc.
-    // Parent references (by role name) always resolve to the first uid.
-    const uidCounts  = new Map(); // role → occurrence count
-    const roleToUid  = new Map(); // role → uid of first occurrence
+    // ── Group rows by (role, parent_role_name) ──────────────────
+    // People sharing the same role AND same manager collapse into one node.
+    // Names are stored sorted alphabetically.
+    const groupMap = new Map(); // "role\0parent" → { role, parent, names[] }
+    raw.filter(r => r.role).forEach(r => {
+      const key = `${r.role}\0${r.parent || ''}`;
+      if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, names: [] });
+      if (r.name) groupMap.get(key).names.push(r.name);
+    });
+    groupMap.forEach(grp => grp.names.sort((a, b) => a.localeCompare(b)));
 
-    const rows = raw
-      .filter(r => !!r.role)
-      .map(r => {
-        const n = (uidCounts.get(r.role) || 0) + 1;
-        uidCounts.set(r.role, n);
-        const uid = n === 1 ? r.role : `${r.role}__${n}`;
-        if (n === 1) roleToUid.set(r.role, uid);
-        return { ...r, uid };
-      });
-
-    if (rows.length === 0)
+    if (groupMap.size === 0)
       throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
 
-    // Resolve each row's parent to the first uid with that role name
+    // ── Assign unique UIDs ──────────────────────────────────────
+    // Same role under different managers still needs distinct UIDs.
+    // First occurrence keeps the plain role name; extras get role__2, etc.
+    const uidCounts = new Map();
+    const roleToUid = new Map(); // role → uid of first occurrence
+
+    const rows = [...groupMap.values()].map(r => {
+      const n = (uidCounts.get(r.role) || 0) + 1;
+      uidCounts.set(r.role, n);
+      const uid = n === 1 ? r.role : `${r.role}__${n}`;
+      if (n === 1) roleToUid.set(r.role, uid);
+      return { ...r, uid };
+    });
+
+    // ── Resolve parent UIDs ─────────────────────────────────────
     rows.forEach(r => {
       r.parentUid = r.parent ? (roleToUid.get(r.parent) || null) : null;
     });
@@ -316,21 +361,22 @@ let _uid = 0;
     if (roots.length === 0)
       throw new Error('No root found. One row must have an empty "Reports To" field.');
     if (roots.length > 1) {
-      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', name: '', parent: null, parentUid: null });
+      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', names: [], parent: null, parentUid: null });
       roots.forEach(r => (r.parentUid = '__ROOT__'));
     }
 
     root = d3.stratify().id(d => d.uid).parentId(d => d.parentUid)(rows);
     root.each(d => { d._uid = ++_uid; });
 
+    // Collapse below depth 2 by default
     root.each(d => {
-      if (d.depth >= 2 && d.children) {
-        d._children = d.children;
-        d.children  = null;
-      }
+      if (d.depth >= 2 && d.children) { d._children = d.children; d.children = null; }
     });
 
-    const total = rows.filter(r => r.uid !== '__ROOT__').length;
+    // People count = sum of persons per node (each name = 1, empty role = 1)
+    const total = rows
+      .filter(r => r.uid !== '__ROOT__')
+      .reduce((s, r) => s + nodePersonCount({ data: r }), 0);
     document.getElementById('people-badge').textContent = `${total} people`;
 
     setupSVG();
@@ -353,25 +399,20 @@ function setupSVG() {
 
   const f = defs.append('filter').attr('id', 'shadow')
     .attr('x', '-25%').attr('y', '-25%').attr('width', '150%').attr('height', '150%');
-  f.append('feDropShadow')
-    .attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4)
+  f.append('feDropShadow').attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4)
     .attr('flood-color', 'rgba(0,0,0,0.10)');
 
   const g2 = defs.append('filter').attr('id', 'glow')
     .attr('x', '-25%').attr('y', '-25%').attr('width', '150%').attr('height', '150%');
-  g2.append('feDropShadow')
-    .attr('dx', 0).attr('dy', 3).attr('stdDeviation', 6)
+  g2.append('feDropShadow').attr('dx', 0).attr('dy', 3).attr('stdDeviation', 6)
     .attr('flood-color', 'rgba(64,145,108,0.25)');
 
   g = svg.append('g').attr('class', 'root-g');
 
-  zoom = d3.zoom()
-    .scaleExtent([0.05, 4])
-    .on('zoom', e => g.attr('transform', e.transform));
-
+  zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', e => g.attr('transform', e.transform));
   svg.call(zoom).on('dblclick.zoom', null);
 
-  treeLayout = d3.tree().nodeSize([NW + HG, NH + VG]);
+  treeLayout = d3.tree().nodeSize([NW + HG, NH_MIN + VG]);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -379,6 +420,11 @@ function setupSVG() {
 // ═══════════════════════════════════════════════════════════════════
 function update(source, instant) {
   const dur = instant ? 0 : DUR;
+
+  // Adjust vertical spacing so the tallest visible card doesn't overlap
+  let maxCardH = NH_MIN;
+  root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
+  treeLayout.nodeSize([NW + HG, maxCardH + VG]);
   treeLayout(root);
 
   const nodes = root.descendants();
@@ -395,19 +441,22 @@ function update(source, instant) {
   const linkEnter = link.enter().insert('path', 'g')
     .attr('class', 'link')
     .attr('d', () => bezier(
-      { x: source.x0 ?? source.x, y: source.y0 ?? source.y },
-      { x: source.x0 ?? source.x, y: source.y0 ?? source.y }
+      { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source },
+      { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source }
     ));
 
   link.merge(linkEnter)
     .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', d => bezier(d.source, d.target));
+    .attr('d', d => bezier(
+      { x: d.source.x, y: d.source.y, _d: d.source },
+      { x: d.target.x, y: d.target.y, _d: d.target }
+    ));
 
   link.exit()
     .transition().duration(dur).ease(d3.easeCubicInOut)
     .attr('d', () => bezier(
-      { x: source.x, y: source.y },
-      { x: source.x, y: source.y }
+      { x: source.x, y: source.y, _d: source },
+      { x: source.x, y: source.y, _d: source }
     ))
     .remove();
 
@@ -425,15 +474,8 @@ function update(source, instant) {
     .on('mousemove', moveTip)
     .on('mouseout',  hideTip);
 
-  ne.append('rect')
-    .attr('class', 'card')
-    .attr('x', -NW / 2).attr('y', -NH / 2)
-    .attr('width', NW).attr('height', NH)
-    .attr('rx', 10)
-    .attr('filter', 'url(#shadow)');
-
-  ne.append('text').attr('class', 'role-lbl');
-  ne.append('text').attr('class', 'name-lbl');
+  // Card rect — dimensions updated in nu.each
+  ne.append('rect').attr('class', 'card').attr('rx', 10).attr('filter', 'url(#shadow)');
 
   const nu = node.merge(ne);
 
@@ -443,25 +485,54 @@ function update(source, instant) {
 
   nu.classed('leaf', d => !d.children && !d._children);
 
-  nu.each(function (d) {
+  // Re-draw card internals on every update
+  nu.each(function(d) {
     const isVirtual = d.data.uid === '__ROOT__';
-    const role = isVirtual ? 'Organization' : d.data.role;
-    const hasName = !!d.data.name && !isVirtual;
-    const sel = d3.select(this);
-    sel.select('.role-lbl').attr('y', hasName ? -17 : 0).text(clip(role, 18));
-    sel.select('.name-lbl').attr('y', hasName ?  16 : 0).text(hasName ? clip(d.data.name, 21) : '');
+    const role   = isVirtual ? 'Organization' : d.data.role;
+    const names  = isVirtual ? [] : (d.data.names || []);
+    const ch     = cardH(d);
+    const layout = cardLayout(d);
+    const sel    = d3.select(this);
+
+    // Card rect
+    sel.select('.card')
+      .attr('x', -NW / 2).attr('y', -ch / 2)
+      .attr('width', NW).attr('height', ch);
+
+    // Remove old text + divider, re-add fresh
+    sel.selectAll('text, line.name-div').remove();
+
+    // Role label
+    sel.append('text').attr('class', 'role-lbl')
+      .attr('y', layout.roleY)
+      .text(clip(role, 18));
+
+    // Divider (multi-person only)
+    if (layout.divY !== null) {
+      sel.append('line').attr('class', 'name-div')
+        .attr('x1', -NW / 2 + 12).attr('x2', NW / 2 - 12)
+        .attr('y1', layout.divY).attr('y2', layout.divY);
+    }
+
+    // Name labels
+    layout.nameYs.forEach((y, i) => {
+      sel.append('text').attr('class', 'name-lbl')
+        .attr('y', y)
+        .text(clip(names[i] || '', 21));
+    });
   });
 
-  // Badges
+  // Badges (count persons, not nodes)
   nu.selectAll('.badge').remove();
-  nu.filter(d => !!d._children).each(function (d) {
-    const n = totalDesc(d);
+  nu.filter(d => !!d._children).each(function(d) {
+    const n = totalPersonDesc(d);
     if (!n) return;
+    const ch    = cardH(d);
     const label = `+${n}`;
-    const bw = Math.max(26, label.length * 7 + 12);
-    const bh = 17;
-    const bg = d3.select(this).append('g').attr('class', 'badge')
-      .attr('transform', `translate(${NW / 2 - bw - 4},${NH / 2 - bh - 4})`);
+    const bw    = Math.max(26, label.length * 7 + 12);
+    const bh    = 17;
+    const bg    = d3.select(this).append('g').attr('class', 'badge')
+      .attr('transform', `translate(${NW / 2 - bw - 4},${ch / 2 - bh - 4})`);
     bg.append('rect').attr('class', 'badge-bg').attr('width', bw).attr('height', bh).attr('rx', 8);
     bg.append('text').attr('class', 'badge-txt').attr('x', bw / 2).attr('y', bh / 2).text(label);
   });
@@ -478,8 +549,12 @@ function update(source, instant) {
 // ═══════════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════
+
+// Bezier link connecting bottom of source card to top of target card
 function bezier(s, t) {
-  const sy = s.y + NH / 2, ty = t.y - NH / 2, my = (sy + ty) / 2;
+  const sy = s.y + cardH(s._d || s) / 2;
+  const ty = t.y - cardH(t._d || t) / 2;
+  const my = (sy + ty) / 2;
   return `M${s.x},${sy} C${s.x},${my} ${t.x},${my} ${t.x},${ty}`;
 }
 
@@ -489,9 +564,10 @@ function toggle(d) {
   update(d);
 }
 
-function totalDesc(node) {
+// Count total persons hidden under a collapsed node
+function totalPersonDesc(node) {
   const kids = (node.children || []).concat(node._children || []);
-  return kids.reduce((s, c) => s + 1 + totalDesc(c), 0);
+  return kids.reduce((s, c) => s + nodePersonCount(c) + totalPersonDesc(c), 0);
 }
 
 function clip(str, n) {
@@ -503,17 +579,25 @@ function clip(str, n) {
 // ═══════════════════════════════════════════════════════════════════
 function fitView() {
   if (!root) return;
+  let maxCardH = NH_MIN;
+  root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
+  treeLayout.nodeSize([NW + HG, maxCardH + VG]);
   treeLayout(root);
+
   const nodes = root.descendants();
   const xs = nodes.map(d => d.x), ys = nodes.map(d => d.y);
-  const x0 = Math.min(...xs) - NW/2 - 24, x1 = Math.max(...xs) + NW/2 + 24;
-  const y0 = Math.min(...ys) - NH/2 - 24, y1 = Math.max(...ys) + NH/2 + 40;
-  const W = document.getElementById('chart').clientWidth;
-  const H = document.getElementById('chart').clientHeight;
-  const sc = Math.min(1, 0.88 * Math.min(W / (x1-x0), H / (y1-y0)));
+  const x0 = Math.min(...xs) - NW / 2 - 24;
+  const x1 = Math.max(...xs) + NW / 2 + 24;
+  const y0 = Math.min(...ys) - maxCardH / 2 - 24;
+  const y1 = Math.max(...ys) + maxCardH / 2 + 40;
+
+  const W  = document.getElementById('chart').clientWidth;
+  const H  = document.getElementById('chart').clientHeight;
+  const sc = Math.min(1, 0.88 * Math.min(W / (x1 - x0), H / (y1 - y0)));
+
   svg.transition().duration(DUR).ease(d3.easeCubicInOut)
     .call(zoom.transform, d3.zoomIdentity
-      .translate(W/2 - sc*(x0+x1)/2, H/2 - sc*(y0+y1)/2)
+      .translate(W / 2 - sc * (x0 + x1) / 2, H / 2 - sc * (y0 + y1) / 2)
       .scale(sc));
 }
 
@@ -558,11 +642,18 @@ function resetView() {
 const tip = document.getElementById('tooltip');
 
 function showTip(event, d) {
-  const role = d.data.uid === '__ROOT__' ? 'Organization' : d.data.role;
-  const hidden = d._children ? totalDesc(d) : 0;
+  const isVirtual = d.data.uid === '__ROOT__';
+  const role   = isVirtual ? 'Organization' : d.data.role;
+  const names  = isVirtual ? [] : (d.data.names || []);
+  const hidden = d._children ? totalPersonDesc(d) : 0;
+
   let html = `<div class="tt-role">${esc(role)}</div>`;
-  if (d.data.name) html += `<div class="tt-name">${esc(d.data.name)}</div>`;
-  if (hidden > 0)  html += `<div class="tt-hidden">+${hidden} hidden report${hidden !== 1 ? 's' : ''}</div>`;
+  if (names.length > 0) {
+    html += names.map(n => `<div class="tt-name">${esc(n)}</div>`).join('');
+  }
+  if (hidden > 0)
+    html += `<div class="tt-hidden">+${hidden} hidden report${hidden !== 1 ? 's' : ''}</div>`;
+
   tip.innerHTML = html;
   tip.classList.add('show');
   moveTip(event);
