@@ -103,6 +103,7 @@
       fill: none;
       stroke: #A8D5B5;
       stroke-width: 3px;
+      stroke-linejoin: round;
     }
 
     .node { cursor: pointer; }
@@ -137,7 +138,6 @@
       pointer-events: none;
     }
 
-    /* Thin divider line between role and names on multi-person cards */
     .name-div {
       stroke: #E3EDE3;
       stroke-width: 1;
@@ -262,15 +262,15 @@ const CSV_URL =
 // ═══════════════════════════════════════════════════════════════════
 //  LAYOUT CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
-const NW      = 155;  // card width
-const NH_MIN  = 76;   // minimum card height (0 or 1 name)
-const NAME_H  = 18;   // px per additional name row
-const HG      = 15;   // horizontal gap between siblings  (-30%)
-const VG      = 56;   // vertical gap between levels      (-30%)
+const NW      = 155;
+const NH_MIN  = 76;
+const NAME_H  = 18;
+const HG      = 15;
+const VG      = 56;
 const DUR     = 500;
 
 // ═══════════════════════════════════════════════════════════════════
-//  CARD GEOMETRY  (all height-related math lives here)
+//  CARD GEOMETRY
 // ═══════════════════════════════════════════════════════════════════
 function cardH(d) {
   const n = nodePersonCount(d);
@@ -295,8 +295,7 @@ function cardLayout(d) {
 }
 
 function nodePersonCount(d) {
-  const names = (d.data.names || []);
-  return Math.max(1, names.length);
+  return Math.max(1, (d.data.names || []).length);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -424,21 +423,21 @@ function update(source, instant) {
 
   const linkEnter = link.enter().insert('path', 'g')
     .attr('class', 'link')
-    .attr('d', () => bezier(
+    .attr('d', () => elbow(
       { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source },
       { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source }
     ));
 
   link.merge(linkEnter)
     .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', d => bezier(
+    .attr('d', d => elbow(
       { x: d.source.x, y: d.source.y, _d: d.source },
       { x: d.target.x, y: d.target.y, _d: d.target }
     ));
 
   link.exit()
     .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', () => bezier(
+    .attr('d', () => elbow(
       { x: source.x, y: source.y, _d: source },
       { x: source.x, y: source.y, _d: source }
     ))
@@ -526,13 +525,12 @@ function update(source, instant) {
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-// Connector exits the bottom of source and enters the top of target.
-// Control points at 30% of the span → gentle curve, not a tight S.
-function bezier(s, t) {
+// Orthogonal elbow connector: down from source → horizontal → down to target
+function elbow(s, t) {
   const sy = s.y + cardH(s._d || s) / 2;
   const ty = t.y - cardH(t._d || t) / 2;
-  const cp = (ty - sy) * 0.3;
-  return `M${s.x},${sy} C${s.x},${sy + cp} ${t.x},${ty - cp} ${t.x},${ty}`;
+  const my = (sy + ty) / 2;
+  return `M${s.x},${sy} L${s.x},${my} L${t.x},${my} L${t.x},${ty}`;
 }
 
 function toggle(d) {
