@@ -36,11 +36,7 @@
       flex-shrink: 0;
     }
 
-    #brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+    #brand { display: flex; align-items: center; gap: 12px; }
 
     #brand h1 {
       font-family: 'DM Serif Display', serif;
@@ -60,10 +56,7 @@
       letter-spacing: 0.1px;
     }
 
-    #controls {
-      display: flex;
-      gap: 8px;
-    }
+    #controls { display: flex; gap: 8px; }
 
     .btn {
       font-family: 'DM Sans', sans-serif;
@@ -79,16 +72,11 @@
       line-height: 1;
       user-select: none;
     }
-
     .btn:hover  { background: #CBF0D5; border-color: #52B788; }
     .btn:active { background: #B7E4C7; }
 
     /* ─── CHART CANVAS ────────────────────────────────────────────────── */
-    #chart {
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-    }
+    #chart { flex: 1; overflow: hidden; position: relative; }
 
     #chart svg {
       display: block;
@@ -98,14 +86,15 @@
     }
     #chart svg:active { cursor: grabbing; }
 
-    /* ─── TREE ELEMENTS ───────────────────────────────────────────────── */
-    .link {
+    /* ─── BUS CONNECTORS ─────────────────────────────────────────────── */
+    .bus {
       fill: none;
       stroke: #A8D5B5;
-      stroke-width: 3px;
-      stroke-linejoin: round;
+      stroke-width: 2.5px;
+      stroke-linecap: round;
     }
 
+    /* ─── NODE CARDS ──────────────────────────────────────────────────── */
     .node { cursor: pointer; }
     .node.leaf { cursor: default; }
 
@@ -114,7 +103,6 @@
       stroke: #C2E5CE;
       stroke-width: 1.5px;
     }
-
     .node:hover .card {
       stroke: #40916C;
       filter: url(#glow);
@@ -131,7 +119,7 @@
 
     .name-lbl {
       font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       fill: #5A8A68;
       text-anchor: middle;
@@ -139,13 +127,16 @@
       pointer-events: none;
     }
 
-    .name-div {
-      stroke: #E3EDE3;
-      stroke-width: 1;
+    /* Distinction shown in parentheses in black */
+    .distinction-lbl {
+      fill: #162416;
+      font-weight: 400;
     }
 
-    .badge-bg   { fill: #40916C; }
-    .badge-txt  {
+    .name-div { stroke: #E3EDE3; stroke-width: 1; }
+
+    .badge-bg { fill: #40916C; }
+    .badge-txt {
       font-family: 'DM Sans', sans-serif;
       font-size: 10px;
       font-weight: 600;
@@ -167,7 +158,6 @@
       background: #F7F4EE;
       z-index: 20;
     }
-
     .spinner {
       width: 36px; height: 36px;
       border: 3px solid #C2E5CE;
@@ -176,9 +166,7 @@
       animation: spin 0.75s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
     #status .status-msg { color: #5A8A68; font-size: 14px; }
-
     #status.error { gap: 10px; }
     #status.error .err-icon { font-size: 40px; }
     #status.error .err-title {
@@ -215,12 +203,13 @@
       opacity: 0;
       transition: opacity 0.12s ease;
       z-index: 999;
-      max-width: 260px;
+      max-width: 280px;
       box-shadow: 0 6px 20px rgba(0,0,0,0.28);
     }
     #tooltip.show { opacity: 1; }
     .tt-role   { font-weight: 600; font-size: 13px; }
     .tt-name   { color: #95D4A8; margin-top: 3px; font-size: 12px; }
+    .tt-dist   { color: #c8d8c8; font-weight: 400; }
     .tt-hidden {
       color: #74C69D;
       font-size: 11.5px;
@@ -263,26 +252,40 @@ const CSV_URL =
 // ═══════════════════════════════════════════════════════════════════
 //  LAYOUT CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
-const NW      = 155;
-const NH_MIN  = 76;
-const NAME_H  = 18;
-const HG      = 15;
-const VG      = 56;
-const DUR     = 500;
+const NH_MIN = 76;   // min card height
+const NAME_H = 18;   // height per extra name row
+const HG     = 20;   // horizontal gap between cards
+const VG     = 56;   // vertical gap between card edges
+const DUR    = 500;  // animation duration ms
 
 // ═══════════════════════════════════════════════════════════════════
-//  CARD GEOMETRY
+//  CARD GEOMETRY  (dynamic width based on content)
 // ═══════════════════════════════════════════════════════════════════
+
+// Estimate rendered card width from text content.
+// DM Serif Display 15px ≈ 8.5px/char; DM Sans 13px 600 ≈ 7.2px/char
+function cardW(d) {
+  if (!d || !d.data) return 140;
+  if (d.data.uid === '__ROOT__') return 140;
+  const role   = d.data.role || '';
+  const people = d.data.people || [];
+  let maxPx = role.length * 8.5;
+  people.forEach(p => {
+    const line = p.distinction ? `${p.name} (${p.distinction})` : (p.name || '');
+    maxPx = Math.max(maxPx, line.length * 7.2);
+  });
+  return Math.max(130, Math.min(300, maxPx + 32));
+}
+
 function cardH(d) {
   const n = nodePersonCount(d);
-  if (n <= 1) return NH_MIN;
-  return NH_MIN + (n - 1) * NAME_H;
+  return n <= 1 ? NH_MIN : NH_MIN + (n - 1) * NAME_H;
 }
 
 function cardLayout(d) {
-  const names = (d.data.names || []);
-  const n     = names.length;
-  const ch    = cardH(d);
+  const people = d.data.people || [];
+  const n      = people.length;
+  const ch     = cardH(d);
 
   if (n === 0) return { roleY: 0, divY: null, nameYs: [] };
   if (n === 1) return { roleY: -17, divY: null, nameYs: [16] };
@@ -291,12 +294,12 @@ function cardLayout(d) {
   const roleY     = -ch / 2 + roleAreaH / 2;
   const divY      = -ch / 2 + roleAreaH;
   const namesTop  = divY + NAME_H / 2 + 2;
-  const nameYs    = names.map((_, i) => namesTop + i * NAME_H);
+  const nameYs    = people.map((_, i) => namesTop + i * NAME_H);
   return { roleY, divY, nameYs };
 }
 
 function nodePersonCount(d) {
-  return Math.max(1, (d.data.names || []).length);
+  return Math.max(1, (d.data.people || []).length);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -315,16 +318,30 @@ let _uid = 0;
         const k = Object.keys(row).find(k => k.trim().toLowerCase() === key);
         return k !== undefined ? (row[k] || '').trim() : '';
       };
-      return { role: get('role'), name: get('name'), parent: get('reports to') || null };
+      return {
+        role:        get('role'),
+        name:        get('name'),
+        distinction: get('distinction'),
+        parent:      get('reports to') || null
+      };
     });
 
     const groupMap = new Map();
     raw.filter(r => r.role).forEach(r => {
       const key = `${r.role}\0${r.parent || ''}`;
-      if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, names: [] });
-      if (r.name) groupMap.get(key).names.push(r.name);
+      if (!groupMap.has(key))
+        groupMap.set(key, { role: r.role, parent: r.parent || null, people: [] });
+      if (r.name)
+        groupMap.get(key).people.push({ name: r.name, distinction: r.distinction || '' });
     });
-    groupMap.forEach(grp => grp.names.sort((a, b) => a.localeCompare(b)));
+
+    // Sort each role's people: distinction first, then first name
+    groupMap.forEach(grp =>
+      grp.people.sort((a, b) => {
+        const dc = (a.distinction || '').localeCompare(b.distinction || '');
+        return dc !== 0 ? dc : (a.name || '').localeCompare(b.name || '');
+      })
+    );
 
     if (groupMap.size === 0)
       throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
@@ -333,7 +350,7 @@ let _uid = 0;
     const roleToUid = new Map();
 
     const rows = [...groupMap.values()].map(r => {
-      const n = (uidCounts.get(r.role) || 0) + 1;
+      const n   = (uidCounts.get(r.role) || 0) + 1;
       uidCounts.set(r.role, n);
       const uid = n === 1 ? r.role : `${r.role}__${n}`;
       if (n === 1) roleToUid.set(r.role, uid);
@@ -348,7 +365,7 @@ let _uid = 0;
     if (roots.length === 0)
       throw new Error('No root found. One row must have an empty "Reports To" field.');
     if (roots.length > 1) {
-      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', names: [], parent: null, parentUid: null });
+      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', people: [], parent: null, parentUid: null });
       roots.forEach(r => (r.parentUid = '__ROOT__'));
     }
 
@@ -397,7 +414,7 @@ function setupSVG() {
   zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', e => g.attr('transform', e.transform));
   svg.call(zoom).on('dblclick.zoom', null);
 
-  treeLayout = d3.tree().nodeSize([NW + HG, NH_MIN + VG]);
+  treeLayout = d3.tree();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -406,45 +423,45 @@ function setupSVG() {
 function update(source, instant) {
   const dur = instant ? 0 : DUR;
 
-  let maxCardH = NH_MIN;
-  root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
-  treeLayout.nodeSize([NW + HG, maxCardH + VG]);
+  // Compute layout dimensions from actual content
+  let maxW = 130, maxCardH = NH_MIN;
+  root.each(d => {
+    maxW     = Math.max(maxW,     cardW(d));
+    maxCardH = Math.max(maxCardH, cardH(d));
+  });
+  treeLayout.nodeSize([maxW + HG, maxCardH + VG]);
   treeLayout(root);
 
   const nodes = root.descendants();
-  const links  = root.links();
 
   nodes.forEach(d => {
     if (d.x0 === undefined) { d.x0 = source.x0 ?? source.x ?? 0; }
     if (d.y0 === undefined) { d.y0 = source.y0 ?? source.y ?? 0; }
   });
 
-  // ── LINKS ──────────────────────────────────────────────────────
-  const link = g.selectAll('path.link').data(links, d => d.target._uid);
+  // ── BUS CONNECTORS (one path per parent, draws stem + rail + drops) ──
+  const busNodes = nodes.filter(d => d.children && d.children.length);
+  const bus = g.selectAll('path.bus').data(busNodes, d => d._uid);
 
-  const linkEnter = link.enter().insert('path', 'g')
-    .attr('class', 'link')
-    .attr('d', () => elbow(
-      { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source },
-      { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source }
-    ));
+  // Update existing buses (animate path as nodes shift)
+  bus.transition().duration(dur).ease(d3.easeCubicInOut)
+    .attr('d', d => buildBusPath(d));
 
-  link.merge(linkEnter)
+  // Enter new buses: draw at position, fade in
+  bus.enter().insert('path', 'g.node')
+    .attr('class', 'bus')
+    .attr('d', d => buildBusPath(d))
+    .style('opacity', 0)
+    .transition().duration(dur)
+    .style('opacity', 1);
+
+  // Exit: fade out
+  bus.exit()
     .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', d => elbow(
-      { x: d.source.x, y: d.source.y, _d: d.source },
-      { x: d.target.x, y: d.target.y, _d: d.target }
-    ));
-
-  link.exit()
-    .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', () => elbow(
-      { x: source.x, y: source.y, _d: source },
-      { x: source.x, y: source.y, _d: source }
-    ))
+    .style('opacity', 0)
     .remove();
 
-  // ── NODES ──────────────────────────────────────────────────────
+  // ── NODES ──────────────────────────────────────────────────────────
   const node = g.selectAll('g.node').data(nodes, d => d._uid);
 
   const ne = node.enter().append('g')
@@ -471,44 +488,50 @@ function update(source, instant) {
   nu.each(function(d) {
     const isVirtual = d.data.uid === '__ROOT__';
     const role   = isVirtual ? 'Organization' : d.data.role;
-    const names  = isVirtual ? [] : (d.data.names || []);
+    const people = isVirtual ? [] : (d.data.people || []);
     const ch     = cardH(d);
+    const cw     = cardW(d);
     const layout = cardLayout(d);
     const sel    = d3.select(this);
 
     sel.select('.card')
-      .attr('x', -NW / 2).attr('y', -ch / 2)
-      .attr('width', NW).attr('height', ch);
+      .attr('x', -cw / 2).attr('y', -ch / 2)
+      .attr('width', cw).attr('height', ch);
 
     sel.selectAll('text, line.name-div').remove();
 
     sel.append('text').attr('class', 'role-lbl')
       .attr('y', layout.roleY)
-      .text(clip(role, 18));
+      .text(clip(role, Math.floor(cw / 8)));
 
     if (layout.divY !== null) {
       sel.append('line').attr('class', 'name-div')
-        .attr('x1', -NW / 2 + 12).attr('x2', NW / 2 - 12)
+        .attr('x1', -cw / 2 + 12).attr('x2', cw / 2 - 12)
         .attr('y1', layout.divY).attr('y2', layout.divY);
     }
 
     layout.nameYs.forEach((y, i) => {
-      sel.append('text').attr('class', 'name-lbl')
-        .attr('y', y)
-        .text(clip(names[i] || '', 21));
+      const person = people[i] || { name: '', distinction: '' };
+      const txt = sel.append('text').attr('class', 'name-lbl').attr('y', y);
+      txt.append('tspan').text(clip(person.name || '', 32));
+      if (person.distinction) {
+        txt.append('tspan').attr('class', 'distinction-lbl')
+          .text(` (${clip(person.distinction, 24)})`);
+      }
     });
   });
 
+  // Collapsed-children badge
   nu.selectAll('.badge').remove();
   nu.filter(d => !!d._children).each(function(d) {
-    const n = totalPersonDesc(d);
+    const n  = totalPersonDesc(d);
     if (!n) return;
-    const ch    = cardH(d);
+    const ch = cardH(d), cw = cardW(d);
     const label = `+${n}`;
-    const bw    = Math.max(26, label.length * 7 + 12);
-    const bh    = 17;
-    const bg    = d3.select(this).append('g').attr('class', 'badge')
-      .attr('transform', `translate(${NW / 2 - bw - 4},${ch / 2 - bh - 4})`);
+    const bw = Math.max(26, label.length * 7 + 12);
+    const bh = 17;
+    const bg = d3.select(this).append('g').attr('class', 'badge')
+      .attr('transform', `translate(${cw / 2 - bw - 4},${ch / 2 - bh - 4})`);
     bg.append('rect').attr('class', 'badge-bg').attr('width', bw).attr('height', bh).attr('rx', 8);
     bg.append('text').attr('class', 'badge-txt').attr('x', bw / 2).attr('y', bh / 2).text(label);
   });
@@ -523,17 +546,29 @@ function update(source, instant) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  HELPERS
+//  BUS CONNECTOR PATH
+//  One SVG path per parent: stem (parent→bus) + rail (leftChild→rightChild)
+//  + one vertical drop per child (bus→childTop)
 // ═══════════════════════════════════════════════════════════════════
+function buildBusPath(d) {
+  const ch = d.children;
+  if (!ch || !ch.length) return '';
 
-// Orthogonal elbow connector: down from source → horizontal → down to target
-function elbow(s, t) {
-  const sy = s.y + cardH(s._d || s) / 2;
-  const ty = t.y - cardH(t._d || t) / 2;
-  const my = (sy + ty) / 2;
-  return `M${s.x},${sy} L${s.x},${my} L${t.x},${my} L${t.x},${ty}`;
+  const pBot = d.y + cardH(d) / 2;
+  const busY = pBot + VG * 0.38;          // bus sits ~38% into the gap
+  const xs   = ch.map(c => c.x);
+  const lx   = Math.min(...xs);
+  const rx   = Math.max(...xs);
+
+  let p = `M${d.x},${pBot}V${busY}`;      // stem
+  if (lx !== rx) p += ` M${lx},${busY}H${rx}`;  // rail
+  ch.forEach(c => { p += ` M${c.x},${busY}V${c.y - cardH(c) / 2}`; }); // drops
+  return p;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════════
 function toggle(d) {
   if (d._children) { d.children = d._children; d._children = null; }
   else if (d.children) { d._children = d.children; d.children = null; }
@@ -554,17 +589,19 @@ function clip(str, n) {
 // ═══════════════════════════════════════════════════════════════════
 function fitView() {
   if (!root) return;
-  let maxCardH = NH_MIN;
-  root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
-  treeLayout.nodeSize([NW + HG, maxCardH + VG]);
+  let maxW = 130, maxCardH = NH_MIN;
+  root.each(d => {
+    maxW     = Math.max(maxW,     cardW(d));
+    maxCardH = Math.max(maxCardH, cardH(d));
+  });
+  treeLayout.nodeSize([maxW + HG, maxCardH + VG]);
   treeLayout(root);
 
   const nodes = root.descendants();
-  const xs = nodes.map(d => d.x), ys = nodes.map(d => d.y);
-  const x0 = Math.min(...xs) - NW / 2 - 24;
-  const x1 = Math.max(...xs) + NW / 2 + 24;
-  const y0 = Math.min(...ys) - maxCardH / 2 - 24;
-  const y1 = Math.max(...ys) + maxCardH / 2 + 40;
+  const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
+  const x1 = Math.max(...nodes.map(d => d.x + cardW(d) / 2)) + 24;
+  const y0 = Math.min(...nodes.map(d => d.y - cardH(d) / 2)) - 24;
+  const y1 = Math.max(...nodes.map(d => d.y + cardH(d) / 2)) + 40;
 
   const W  = document.getElementById('chart').clientWidth;
   const H  = document.getElementById('chart').clientHeight;
@@ -619,13 +656,16 @@ const tip = document.getElementById('tooltip');
 function showTip(event, d) {
   const isVirtual = d.data.uid === '__ROOT__';
   const role   = isVirtual ? 'Organization' : d.data.role;
-  const names  = isVirtual ? [] : (d.data.names || []);
+  const people = isVirtual ? [] : (d.data.people || []);
   const hidden = d._children ? totalPersonDesc(d) : 0;
 
   let html = `<div class="tt-role">${esc(role)}</div>`;
-  if (names.length > 0) {
-    html += names.map(n => `<div class="tt-name">${esc(n)}</div>`).join('');
-  }
+  people.forEach(p => {
+    const dist = p.distinction
+      ? ` <span class="tt-dist">(${esc(p.distinction)})</span>`
+      : '';
+    html += `<div class="tt-name">${esc(p.name)}${dist}</div>`;
+  });
   if (hidden > 0)
     html += `<div class="tt-hidden">+${hidden} hidden report${hidden !== 1 ? 's' : ''}</div>`;
 
@@ -636,8 +676,8 @@ function showTip(event, d) {
 
 function moveTip(event) {
   let x = event.clientX + 14, y = event.clientY - 14;
-  if (x + 280 > window.innerWidth)  x = event.clientX - 294;
-  if (y + 110 > window.innerHeight) y = event.clientY - 124;
+  if (x + 300 > window.innerWidth)  x = event.clientX - 314;
+  if (y + 120 > window.innerHeight) y = event.clientY - 134;
   tip.style.left = `${x}px`;
   tip.style.top  = `${y}px`;
 }
