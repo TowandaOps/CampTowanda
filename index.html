@@ -389,12 +389,10 @@ let _uid = 0;
     raw.filter(r => r.role).forEach(r => {
       const key = `${r.role}\0${r.parent || ''}`;
       if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, people: [] });
-      if (r.name) {
-        groupMap.get(key).people.push({
-          name: r.name,
-          distinction: r.distinction || '',
-        });
-      }
+      groupMap.get(key).people.push({
+        name: r.name || 'OPEN',
+        distinction: r.distinction || '',
+      });
     });
     groupMap.forEach(grp => grp.people.sort(comparePeople));
 
