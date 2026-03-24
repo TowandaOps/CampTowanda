@@ -280,7 +280,8 @@ const DIST_H  = 14;
 const PERSON_GAP = 8;
 const TEXT_PAD_X = 14;
 const HG      = 3;
-const SUBTREE_GAP = 96;
+const SUBTREE_GAP = 28;
+const TOP_BRANCH_GAP = 180;
 const LEVEL_GAP = 10;
 const BUS_CLEARANCE = 5;
 const BUS_MIN_STEM = 7;
@@ -656,11 +657,12 @@ function compactSubtrees(node) {
   const children = node.children || [];
   children.forEach(compactSubtrees);
   if (children.length === 0) return;
+  const gap = subtreeGap(node);
 
   for (let i = 1; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const targetMin = left.max + SUBTREE_GAP;
+    const targetMin = left.max + gap;
     const shift = targetMin - right.min;
     if (shift !== 0) shiftSubtree(children[i], shift);
   }
@@ -668,12 +670,17 @@ function compactSubtrees(node) {
   for (let i = 2; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const targetMin = left.max + SUBTREE_GAP;
+    const targetMin = left.max + gap;
     const shift = targetMin - right.min;
     if (shift > 0) shiftSubtree(children[i], shift);
   }
 
   node.x = (children[0].x + children[children.length - 1].x) / 2;
+}
+
+function subtreeGap(node) {
+  const topBranchDepth = root && root.data && root.data.uid === '__ROOT__' ? 1 : 0;
+  return node.depth === topBranchDepth ? TOP_BRANCH_GAP : SUBTREE_GAP;
 }
 
 function alignLevelTops(rootNode) {
