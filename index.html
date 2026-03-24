@@ -681,11 +681,11 @@ function collapsedBus(node) {
 
 function toggle(d) {
   const opening = !!d._children;
-  const focusTarget = opening ? d : (d.parent || d);
+  const focusTarget = opening ? d : visibleParentOf(d);
   if (d._children) { d.children = d._children; d._children = null; }
   else if (d.children) { d._children = d.children; d.children = null; }
   update(d);
-  setTimeout(() => focusExpandedCard(focusTarget), DUR + 60);
+  setTimeout(() => focusNodeAndReports(focusTarget), DUR + 60);
 }
 
 function totalPersonDesc(node) {
@@ -784,15 +784,24 @@ function fitView() {
       .scale(sc));
 }
 
-function focusExpandedCard(node) {
+function visibleParentOf(node) {
+  return node.parent && node.parent.data.uid !== '__ROOT__' ? node.parent : node;
+}
+
+function directReports(node) {
+  return (node.children && node.children.length ? node.children : [])
+    .concat(node._children && node._children.length ? node._children : []);
+}
+
+function focusNodeAndReports(node) {
   if (!root || !svg) return;
 
-  const reports = node.children && node.children.length ? node.children : [node];
-  const x0 = Math.min(...reports.map(d => d.x - cardW(d) / 2)) - 24;
-  const x1 = Math.max(...reports.map(d => d.x + cardW(d) / 2)) + 24;
+  const reports = directReports(node);
+  const framed = reports.length ? reports : [node];
+  const x0 = Math.min(...framed.map(d => d.x - cardW(d) / 2)) - 24;
+  const x1 = Math.max(...framed.map(d => d.x + cardW(d) / 2)) + 24;
 
   const W = document.getElementById('chart').clientWidth;
-  const H = document.getElementById('chart').clientHeight;
   const topPad = 28;
   const sc = Math.min(1, 0.92 * (W / Math.max(1, x1 - x0)));
   const cardTop = node.y - cardH(node) / 2;
