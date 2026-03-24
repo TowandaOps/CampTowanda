@@ -139,6 +139,15 @@
       pointer-events: none;
     }
 
+    .dist-lbl {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      fill: #162416;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
     .name-div {
       stroke: #E3EDE3;
       stroke-width: 1;
@@ -263,9 +272,13 @@ const CSV_URL =
 // ═══════════════════════════════════════════════════════════════════
 //  LAYOUT CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
-const NW      = 155;
+const MIN_CARD_W = 155;
 const NH_MIN  = 76;
+const ROLE_H  = 34;
 const NAME_H  = 18;
+const DIST_H  = 14;
+const PERSON_GAP = 8;
+const TEXT_PAD_X = 18;
 const HG      = 15;
 const VG      = 56;
 const DUR     = 500;
@@ -274,29 +287,78 @@ const DUR     = 500;
 //  CARD GEOMETRY
 // ═══════════════════════════════════════════════════════════════════
 function cardH(d) {
-  const n = nodePersonCount(d);
-  if (n <= 1) return NH_MIN;
-  return NH_MIN + (n - 1) * NAME_H;
+  const people = nodePeople(d);
+  if (people.length === 0) return NH_MIN;
+
+  const peopleH = people.reduce((sum, person, index) => {
+    const blockH = NAME_H + (person.distinction ? DIST_H + 4 : 0);
+    return sum + blockH + (index > 0 ? PERSON_GAP : 0);
+  }, 0);
+
+  return Math.max(NH_MIN, 18 + ROLE_H + peopleH + 16);
+}
+
+function cardW(d) {
+  const people = nodePeople(d);
+  const role = d.data.uid === '__ROOT__' ? 'Organization' : (d.data.role || '');
+  const widest = Math.max(
+    estimateRoleWidth(role),
+    ...people.flatMap(person => [
+      estimateNameWidth(person.name || ''),
+      person.distinction ? estimateDistWidth(`(${person.distinction})`) : 0,
+    ]),
+  );
+  return Math.max(MIN_CARD_W, widest + TEXT_PAD_X * 2);
 }
 
 function cardLayout(d) {
-  const names = (d.data.names || []);
-  const n     = names.length;
   const ch    = cardH(d);
+  const people = nodePeople(d);
+  const roleY  = -ch / 2 + 18 + ROLE_H / 2;
 
-  if (n === 0) return { roleY: 0, divY: null, nameYs: [] };
-  if (n === 1) return { roleY: -17, divY: null, nameYs: [16] };
+  if (people.length === 0) return { roleY, divY: null, people: [] };
 
-  const roleAreaH = 34;
-  const roleY     = -ch / 2 + roleAreaH / 2;
-  const divY      = -ch / 2 + roleAreaH;
-  const namesTop  = divY + NAME_H / 2 + 2;
-  const nameYs    = names.map((_, i) => namesTop + i * NAME_H);
-  return { roleY, divY, nameYs };
+  const divY = -ch / 2 + 18 + ROLE_H;
+  let cursorY = divY + 12;
+  const lines = people.map(person => {
+    const blockH = NAME_H + (person.distinction ? DIST_H + 4 : 0);
+    const nameY = cursorY + NAME_H / 2;
+    const distinctionY = person.distinction ? nameY + NAME_H / 2 + DIST_H / 2 + 4 : null;
+    cursorY += blockH + PERSON_GAP;
+    return { person, nameY, distinctionY };
+  });
+
+  return { roleY, divY, people: lines };
 }
 
 function nodePersonCount(d) {
-  return Math.max(1, (d.data.names || []).length);
+  return Math.max(1, nodePeople(d).length);
+}
+
+function nodePeople(d) {
+  return d.data.people || [];
+}
+
+function estimateRoleWidth(text) {
+  return text.length * 9.5;
+}
+
+function estimateNameWidth(text) {
+  return text.length * 8.1;
+}
+
+function estimateDistWidth(text) {
+  return text.length * 7.2;
+}
+
+function firstName(name) {
+  return (name || '').trim().split(/\s+/)[0] || '';
+}
+
+function comparePeople(a, b) {
+  return (a.distinction || '\uffff').localeCompare(b.distinction || '\uffff')
+    || firstName(a.name).localeCompare(firstName(b.name))
+    || (a.name || '').localeCompare(b.name || '');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -315,16 +377,26 @@ let _uid = 0;
         const k = Object.keys(row).find(k => k.trim().toLowerCase() === key);
         return k !== undefined ? (row[k] || '').trim() : '';
       };
-      return { role: get('role'), name: get('name'), parent: get('reports to') || null };
+      return {
+        role: get('role'),
+        name: get('name'),
+        parent: get('reports to') || null,
+        distinction: get('distinction'),
+      };
     });
 
     const groupMap = new Map();
     raw.filter(r => r.role).forEach(r => {
       const key = `${r.role}\0${r.parent || ''}`;
-      if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, names: [] });
-      if (r.name) groupMap.get(key).names.push(r.name);
+      if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, people: [] });
+      if (r.name) {
+        groupMap.get(key).people.push({
+          name: r.name,
+          distinction: r.distinction || '',
+        });
+      }
     });
-    groupMap.forEach(grp => grp.names.sort((a, b) => a.localeCompare(b)));
+    groupMap.forEach(grp => grp.people.sort(comparePeople));
 
     if (groupMap.size === 0)
       throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
@@ -348,7 +420,7 @@ let _uid = 0;
     if (roots.length === 0)
       throw new Error('No root found. One row must have an empty "Reports To" field.');
     if (roots.length > 1) {
-      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', names: [], parent: null, parentUid: null });
+      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', people: [], parent: null, parentUid: null });
       roots.forEach(r => (r.parentUid = '__ROOT__'));
     }
 
@@ -397,7 +469,7 @@ function setupSVG() {
   zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', e => g.attr('transform', e.transform));
   svg.call(zoom).on('dblclick.zoom', null);
 
-  treeLayout = d3.tree().nodeSize([NW + HG, NH_MIN + VG]);
+  treeLayout = d3.tree().nodeSize([MIN_CARD_W + HG, NH_MIN + VG]);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -407,12 +479,16 @@ function update(source, instant) {
   const dur = instant ? 0 : DUR;
 
   let maxCardH = NH_MIN;
-  root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
-  treeLayout.nodeSize([NW + HG, maxCardH + VG]);
+  let maxCardW = MIN_CARD_W;
+  root.each(d => {
+    maxCardH = Math.max(maxCardH, cardH(d));
+    maxCardW = Math.max(maxCardW, cardW(d));
+  });
+  treeLayout.nodeSize([maxCardW + HG, maxCardH + VG]);
   treeLayout(root);
 
   const nodes = root.descendants();
-  const links  = root.links();
+  const links = nodes.filter(d => (d.children || []).length > 0);
 
   nodes.forEach(d => {
     if (d.x0 === undefined) { d.x0 = source.x0 ?? source.x ?? 0; }
@@ -420,28 +496,19 @@ function update(source, instant) {
   });
 
   // ── LINKS ──────────────────────────────────────────────────────
-  const link = g.selectAll('path.link').data(links, d => d.target._uid);
+  const link = g.selectAll('path.link').data(links, d => d._uid);
 
   const linkEnter = link.enter().insert('path', 'g')
     .attr('class', 'link')
-    .attr('d', () => elbow(
-      { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source },
-      { x: source.x0 ?? source.x, y: source.y0 ?? source.y, _d: source }
-    ));
+    .attr('d', () => collapsedBus(source));
 
   link.merge(linkEnter)
     .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', d => elbow(
-      { x: d.source.x, y: d.source.y, _d: d.source },
-      { x: d.target.x, y: d.target.y, _d: d.target }
-    ));
+    .attr('d', d => busPath(d));
 
   link.exit()
     .transition().duration(dur).ease(d3.easeCubicInOut)
-    .attr('d', () => elbow(
-      { x: source.x, y: source.y, _d: source },
-      { x: source.x, y: source.y, _d: source }
-    ))
+    .attr('d', () => collapsedBus(source))
     .remove();
 
   // ── NODES ──────────────────────────────────────────────────────
@@ -471,31 +538,38 @@ function update(source, instant) {
   nu.each(function(d) {
     const isVirtual = d.data.uid === '__ROOT__';
     const role   = isVirtual ? 'Organization' : d.data.role;
-    const names  = isVirtual ? [] : (d.data.names || []);
+    const people = isVirtual ? [] : nodePeople(d);
     const ch     = cardH(d);
+    const cw     = cardW(d);
     const layout = cardLayout(d);
     const sel    = d3.select(this);
 
     sel.select('.card')
-      .attr('x', -NW / 2).attr('y', -ch / 2)
-      .attr('width', NW).attr('height', ch);
+      .attr('x', -cw / 2).attr('y', -ch / 2)
+      .attr('width', cw).attr('height', ch);
 
     sel.selectAll('text, line.name-div').remove();
 
     sel.append('text').attr('class', 'role-lbl')
       .attr('y', layout.roleY)
-      .text(clip(role, 18));
+      .text(role);
 
     if (layout.divY !== null) {
       sel.append('line').attr('class', 'name-div')
-        .attr('x1', -NW / 2 + 12).attr('x2', NW / 2 - 12)
+        .attr('x1', -cw / 2 + 12).attr('x2', cw / 2 - 12)
         .attr('y1', layout.divY).attr('y2', layout.divY);
     }
 
-    layout.nameYs.forEach((y, i) => {
+    layout.people.forEach(({ person, nameY, distinctionY }) => {
       sel.append('text').attr('class', 'name-lbl')
-        .attr('y', y)
-        .text(clip(names[i] || '', 21));
+        .attr('y', nameY)
+        .text(person.name || '');
+
+      if (distinctionY !== null) {
+        sel.append('text').attr('class', 'dist-lbl')
+          .attr('y', distinctionY)
+          .text(`(${person.distinction})`);
+      }
     });
   });
 
@@ -503,12 +577,13 @@ function update(source, instant) {
   nu.filter(d => !!d._children).each(function(d) {
     const n = totalPersonDesc(d);
     if (!n) return;
+    const cw    = cardW(d);
     const ch    = cardH(d);
     const label = `+${n}`;
     const bw    = Math.max(26, label.length * 7 + 12);
     const bh    = 17;
     const bg    = d3.select(this).append('g').attr('class', 'badge')
-      .attr('transform', `translate(${NW / 2 - bw - 4},${ch / 2 - bh - 4})`);
+      .attr('transform', `translate(${cw / 2 - bw - 4},${ch / 2 - bh - 4})`);
     bg.append('rect').attr('class', 'badge-bg').attr('width', bw).attr('height', bh).attr('rx', 8);
     bg.append('text').attr('class', 'badge-txt').attr('x', bw / 2).attr('y', bh / 2).text(label);
   });
@@ -526,12 +601,35 @@ function update(source, instant) {
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-// Orthogonal elbow connector: down from source → horizontal → down to target
-function elbow(s, t) {
-  const sy = s.y + cardH(s._d || s) / 2;
-  const ty = t.y - cardH(t._d || t) / 2;
-  const my = (sy + ty) / 2;
-  return `M${s.x},${sy} L${s.x},${my} L${t.x},${my} L${t.x},${ty}`;
+// Bus connector: parent stem → shared horizontal bus → child stems
+function busPath(parent) {
+  const children = parent.children || [];
+  if (children.length === 0) return collapsedBus(parent);
+
+  const sy = parent.y + cardH(parent) / 2;
+  if (children.length === 1) {
+    const child = children[0];
+    const ty = child.y - cardH(child) / 2;
+    const my = (sy + ty) / 2;
+    return `M${parent.x},${sy} L${parent.x},${my} L${child.x},${my} L${child.x},${ty}`;
+  }
+
+  const childTops = children.map(child => child.y - cardH(child) / 2);
+  const tyMin = Math.min(...childTops);
+  const busY = Math.min(tyMin - 12, sy + Math.max(18, (tyMin - sy) / 2));
+  const xs = children.map(child => child.x).sort((a, b) => a - b);
+
+  let path = `M${parent.x},${sy} L${parent.x},${busY} M${xs[0]},${busY} L${xs[xs.length - 1]},${busY}`;
+  children.forEach(child => {
+    path += ` M${child.x},${busY} L${child.x},${child.y - cardH(child) / 2}`;
+  });
+  return path;
+}
+
+function collapsedBus(node) {
+  const x = node.x0 ?? node.x ?? 0;
+  const y = (node.y0 ?? node.y ?? 0) + cardH(node) / 2;
+  return `M${x},${y} L${x},${y}`;
 }
 
 function toggle(d) {
@@ -545,26 +643,25 @@ function totalPersonDesc(node) {
   return kids.reduce((s, c) => s + nodePersonCount(c) + totalPersonDesc(c), 0);
 }
 
-function clip(str, n) {
-  return str && str.length > n ? str.slice(0, n - 1) + '\u2026' : (str || '');
-}
-
 // ═══════════════════════════════════════════════════════════════════
 //  FIT VIEW
 // ═══════════════════════════════════════════════════════════════════
 function fitView() {
   if (!root) return;
   let maxCardH = NH_MIN;
-  root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
-  treeLayout.nodeSize([NW + HG, maxCardH + VG]);
+  let maxCardW = MIN_CARD_W;
+  root.each(d => {
+    maxCardH = Math.max(maxCardH, cardH(d));
+    maxCardW = Math.max(maxCardW, cardW(d));
+  });
+  treeLayout.nodeSize([maxCardW + HG, maxCardH + VG]);
   treeLayout(root);
 
   const nodes = root.descendants();
-  const xs = nodes.map(d => d.x), ys = nodes.map(d => d.y);
-  const x0 = Math.min(...xs) - NW / 2 - 24;
-  const x1 = Math.max(...xs) + NW / 2 + 24;
-  const y0 = Math.min(...ys) - maxCardH / 2 - 24;
-  const y1 = Math.max(...ys) + maxCardH / 2 + 40;
+  const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
+  const x1 = Math.max(...nodes.map(d => d.x + cardW(d) / 2)) + 24;
+  const y0 = Math.min(...nodes.map(d => d.y - cardH(d) / 2)) - 24;
+  const y1 = Math.max(...nodes.map(d => d.y + cardH(d) / 2)) + 40;
 
   const W  = document.getElementById('chart').clientWidth;
   const H  = document.getElementById('chart').clientHeight;
@@ -619,12 +716,15 @@ const tip = document.getElementById('tooltip');
 function showTip(event, d) {
   const isVirtual = d.data.uid === '__ROOT__';
   const role   = isVirtual ? 'Organization' : d.data.role;
-  const names  = isVirtual ? [] : (d.data.names || []);
+  const people = isVirtual ? [] : nodePeople(d);
   const hidden = d._children ? totalPersonDesc(d) : 0;
 
   let html = `<div class="tt-role">${esc(role)}</div>`;
-  if (names.length > 0) {
-    html += names.map(n => `<div class="tt-name">${esc(n)}</div>`).join('');
+  if (people.length > 0) {
+    html += people.map(person => {
+      const detail = person.distinction ? ` (${person.distinction})` : '';
+      return `<div class="tt-name">${esc((person.name || '') + detail)}</div>`;
+    }).join('');
   }
   if (hidden > 0)
     html += `<div class="tt-hidden">+${hidden} hidden report${hidden !== 1 ? 's' : ''}</div>`;
