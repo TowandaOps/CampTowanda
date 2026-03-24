@@ -279,8 +279,10 @@ const NAME_H  = 18;
 const DIST_H  = 14;
 const PERSON_GAP = 8;
 const TEXT_PAD_X = 14;
-const HG      = 8;
-const LEVEL_GAP = 26;
+const HG      = 3;
+const LEVEL_GAP = 10;
+const BUS_CLEARANCE = 5;
+const BUS_MIN_STEM = 7;
 const DUR     = 500;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -620,7 +622,7 @@ function busPath(parent) {
 
   const childTops = children.map(child => child.y - cardH(child) / 2);
   const tyMin = Math.min(...childTops);
-  const busY = Math.min(tyMin - 12, sy + Math.max(18, (tyMin - sy) / 2));
+  const busY = Math.min(tyMin - BUS_CLEARANCE, sy + Math.max(BUS_MIN_STEM, (tyMin - sy) / 2));
   const xs = children.map(child => child.x).sort((a, b) => a - b);
 
   let path = `M${parent.x},${sy} L${parent.x},${busY} M${xs[0]},${busY} L${xs[xs.length - 1]},${busY}`;
