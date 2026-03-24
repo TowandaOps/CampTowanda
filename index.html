@@ -279,7 +279,7 @@ const NAME_H  = 18;
 const DIST_H  = 14;
 const PERSON_GAP = 8;
 const TEXT_PAD_X = 14;
-const HG      = 5;
+const HG      = 3;
 const LEVEL_GAP = 10;
 const BUS_CLEARANCE = 5;
 const BUS_MIN_STEM = 7;
@@ -483,9 +483,10 @@ function update(source, instant) {
     maxCardH = Math.max(maxCardH, cardH(d));
     maxCardW = Math.max(maxCardW, cardW(d));
   });
-  treeLayout.nodeSize([maxCardW + HG, NH_MIN + LEVEL_GAP]);
+  treeLayout.nodeSize([MIN_CARD_W + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
   applyDepthSpacing(root);
+  compactSubtrees(root);
 
   const nodes = root.descendants();
   const links = nodes.filter(d => (d.children || []).length > 0);
@@ -649,6 +650,45 @@ function totalPersonDesc(node) {
   return kids.reduce((s, c) => s + nodePersonCount(c) + totalPersonDesc(c), 0);
 }
 
+function compactSubtrees(node) {
+  const children = node.children || [];
+  children.forEach(compactSubtrees);
+  if (children.length === 0) return;
+
+  for (let i = 1; i < children.length; i++) {
+    const left = subtreeExtent(children[i - 1]);
+    const right = subtreeExtent(children[i]);
+    const overlap = left.max + HG - right.min;
+    if (overlap > 0) shiftSubtree(children[i], overlap);
+  }
+
+  for (let i = 2; i < children.length; i++) {
+    const left = subtreeExtent(children[i - 1]);
+    const right = subtreeExtent(children[i]);
+    const overlap = left.max + HG - right.min;
+    if (overlap > 0) shiftSubtree(children[i], overlap);
+  }
+
+  node.x = (children[0].x + children[children.length - 1].x) / 2;
+}
+
+function subtreeExtent(node) {
+  let min = Infinity;
+  let max = -Infinity;
+
+  node.each(desc => {
+    const half = cardW(desc) / 2;
+    min = Math.min(min, desc.x - half);
+    max = Math.max(max, desc.x + half);
+  });
+
+  return { min, max };
+}
+
+function shiftSubtree(node, dx) {
+  node.each(desc => { desc.x += dx; });
+}
+
 function applyDepthSpacing(rootNode) {
   const levels = new Map();
 
@@ -685,9 +725,10 @@ function fitView() {
     maxCardH = Math.max(maxCardH, cardH(d));
     maxCardW = Math.max(maxCardW, cardW(d));
   });
-  treeLayout.nodeSize([maxCardW + HG, NH_MIN + LEVEL_GAP]);
+  treeLayout.nodeSize([MIN_CARD_W + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
   applyDepthSpacing(root);
+  compactSubtrees(root);
 
   const nodes = root.descendants();
   const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
