@@ -280,8 +280,7 @@ const DIST_H  = 14;
 const PERSON_GAP = 8;
 const TEXT_PAD_X = 14;
 const HG      = 3;
-const SUBTREE_GAP = 28;
-const TOP_BRANCH_GAP = 180;
+const SUBTREE_GAP = 96;
 const LEVEL_GAP = 10;
 const BUS_CLEARANCE = 5;
 const BUS_MIN_STEM = 7;
@@ -487,9 +486,8 @@ function update(source, instant) {
   });
   treeLayout.nodeSize([MIN_CARD_W + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
-  applyDepthSpacing(root);
   compactSubtrees(root);
-  alignLevelTops(root);
+  applyBranchPacking(root);
 
   const nodes = root.descendants();
   const links = nodes.filter(d => (d.children || []).length > 0);
@@ -657,12 +655,11 @@ function compactSubtrees(node) {
   const children = node.children || [];
   children.forEach(compactSubtrees);
   if (children.length === 0) return;
-  const gap = subtreeGap(node);
 
   for (let i = 1; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const targetMin = left.max + gap;
+    const targetMin = left.max + SUBTREE_GAP;
     const shift = targetMin - right.min;
     if (shift !== 0) shiftSubtree(children[i], shift);
   }
@@ -670,33 +667,12 @@ function compactSubtrees(node) {
   for (let i = 2; i < children.length; i++) {
     const left = subtreeExtent(children[i - 1]);
     const right = subtreeExtent(children[i]);
-    const targetMin = left.max + gap;
+    const targetMin = left.max + SUBTREE_GAP;
     const shift = targetMin - right.min;
     if (shift > 0) shiftSubtree(children[i], shift);
   }
 
   node.x = (children[0].x + children[children.length - 1].x) / 2;
-}
-
-function subtreeGap(node) {
-  const topBranchDepth = root && root.data && root.data.uid === '__ROOT__' ? 1 : 0;
-  return node.depth === topBranchDepth ? TOP_BRANCH_GAP : SUBTREE_GAP;
-}
-
-function alignLevelTops(rootNode) {
-  const levels = new Map();
-
-  rootNode.each(node => {
-    if (!levels.has(node.depth)) levels.set(node.depth, []);
-    levels.get(node.depth).push(node);
-  });
-
-  levels.forEach(nodes => {
-    const topY = Math.min(...nodes.map(node => node.y - cardH(node) / 2));
-    nodes.forEach(node => {
-      node.y = topY + cardH(node) / 2;
-    });
-  });
 }
 
 function subtreeExtent(node) {
@@ -716,28 +692,21 @@ function shiftSubtree(node, dx) {
   node.each(desc => { desc.x += dx; });
 }
 
-function applyDepthSpacing(rootNode) {
-  const levels = new Map();
+function applyBranchPacking(rootNode) {
+  rootNode.y = cardH(rootNode) / 2;
+  packBranchChildren(rootNode);
+}
 
-  rootNode.each(node => {
-    if (!levels.has(node.depth)) levels.set(node.depth, []);
-    levels.get(node.depth).push(node);
-  });
+function packBranchChildren(parent) {
+  const children = parent.children || [];
+  if (children.length === 0) return;
 
-  const depths = [...levels.keys()].sort((a, b) => a - b);
-  let topY = 0;
+  const parentTop = parent.y - cardH(parent) / 2;
+  const childTop = parentTop + cardH(parent) + Math.max(LEVEL_GAP, cardH(parent) / 2);
 
-  depths.forEach((depth, index) => {
-    const nodes = levels.get(depth);
-    const maxHeight = Math.max(...nodes.map(node => cardH(node)));
-
-    if (index > 0) {
-      const prevNodes = levels.get(depths[index - 1]);
-      const prevMaxHeight = Math.max(...prevNodes.map(node => cardH(node)));
-      topY += prevMaxHeight + Math.max(LEVEL_GAP, prevMaxHeight / 2);
-    }
-
-    nodes.forEach(node => { node.y = topY + cardH(node) / 2; });
+  children.forEach(child => {
+    child.y = childTop + cardH(child) / 2;
+    packBranchChildren(child);
   });
 }
 
@@ -754,9 +723,8 @@ function fitView() {
   });
   treeLayout.nodeSize([MIN_CARD_W + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
-  applyDepthSpacing(root);
   compactSubtrees(root);
-  alignLevelTops(root);
+  applyBranchPacking(root);
 
   const nodes = root.descendants();
   const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
