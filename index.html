@@ -102,7 +102,7 @@
     .link {
       fill: none;
       stroke: #A8D5B5;
-      stroke-width: 2px;
+      stroke-width: 3px;
     }
 
     .node { cursor: pointer; }
@@ -265,22 +265,19 @@ const CSV_URL =
 const NW      = 155;  // card width
 const NH_MIN  = 76;   // minimum card height (0 or 1 name)
 const NAME_H  = 18;   // px per additional name row
-const HG      = 22;   // horizontal gap between siblings
-const VG      = 80;   // vertical gap between levels
+const HG      = 15;   // horizontal gap between siblings  (-30%)
+const VG      = 56;   // vertical gap between levels      (-30%)
 const DUR     = 500;
 
 // ═══════════════════════════════════════════════════════════════════
 //  CARD GEOMETRY  (all height-related math lives here)
 // ═══════════════════════════════════════════════════════════════════
-// Returns the pixel height of a node's card.
 function cardH(d) {
   const n = nodePersonCount(d);
   if (n <= 1) return NH_MIN;
-  // extra rows beyond the first
   return NH_MIN + (n - 1) * NAME_H;
 }
 
-// Returns { roleY, divY, nameYs[] } — all relative to card center (0,0).
 function cardLayout(d) {
   const names = (d.data.names || []);
   const n     = names.length;
@@ -289,17 +286,14 @@ function cardLayout(d) {
   if (n === 0) return { roleY: 0, divY: null, nameYs: [] };
   if (n === 1) return { roleY: -17, divY: null, nameYs: [16] };
 
-  // Multi-person: role header + divider + stacked names
-  // role sits in the top portion of the card
-  const roleAreaH = 34;                        // px reserved for role label
-  const roleY     = -ch / 2 + roleAreaH / 2;  // center of role area
-  const divY      = -ch / 2 + roleAreaH;      // divider line y
-  const namesTop  = divY + NAME_H / 2 + 2;    // center of first name
+  const roleAreaH = 34;
+  const roleY     = -ch / 2 + roleAreaH / 2;
+  const divY      = -ch / 2 + roleAreaH;
+  const namesTop  = divY + NAME_H / 2 + 2;
   const nameYs    = names.map((_, i) => namesTop + i * NAME_H);
   return { roleY, divY, nameYs };
 }
 
-// How many people this node represents (≥1 for empty roles = unfilled position)
 function nodePersonCount(d) {
   const names = (d.data.names || []);
   return Math.max(1, names.length);
@@ -324,10 +318,7 @@ let _uid = 0;
       return { role: get('role'), name: get('name'), parent: get('reports to') || null };
     });
 
-    // ── Group rows by (role, parent_role_name) ──────────────────
-    // People sharing the same role AND same manager collapse into one node.
-    // Names are stored sorted alphabetically.
-    const groupMap = new Map(); // "role\0parent" → { role, parent, names[] }
+    const groupMap = new Map();
     raw.filter(r => r.role).forEach(r => {
       const key = `${r.role}\0${r.parent || ''}`;
       if (!groupMap.has(key)) groupMap.set(key, { role: r.role, parent: r.parent || null, names: [] });
@@ -338,11 +329,8 @@ let _uid = 0;
     if (groupMap.size === 0)
       throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
 
-    // ── Assign unique UIDs ──────────────────────────────────────
-    // Same role under different managers still needs distinct UIDs.
-    // First occurrence keeps the plain role name; extras get role__2, etc.
     const uidCounts = new Map();
-    const roleToUid = new Map(); // role → uid of first occurrence
+    const roleToUid = new Map();
 
     const rows = [...groupMap.values()].map(r => {
       const n = (uidCounts.get(r.role) || 0) + 1;
@@ -352,7 +340,6 @@ let _uid = 0;
       return { ...r, uid };
     });
 
-    // ── Resolve parent UIDs ─────────────────────────────────────
     rows.forEach(r => {
       r.parentUid = r.parent ? (roleToUid.get(r.parent) || null) : null;
     });
@@ -368,12 +355,10 @@ let _uid = 0;
     root = d3.stratify().id(d => d.uid).parentId(d => d.parentUid)(rows);
     root.each(d => { d._uid = ++_uid; });
 
-    // Collapse below depth 2 by default
     root.each(d => {
       if (d.depth >= 2 && d.children) { d._children = d.children; d.children = null; }
     });
 
-    // People count = sum of persons per node (each name = 1, empty role = 1)
     const total = rows
       .filter(r => r.uid !== '__ROOT__')
       .reduce((s, r) => s + nodePersonCount({ data: r }), 0);
@@ -421,7 +406,6 @@ function setupSVG() {
 function update(source, instant) {
   const dur = instant ? 0 : DUR;
 
-  // Adjust vertical spacing so the tallest visible card doesn't overlap
   let maxCardH = NH_MIN;
   root.each(d => { maxCardH = Math.max(maxCardH, cardH(d)); });
   treeLayout.nodeSize([NW + HG, maxCardH + VG]);
@@ -474,7 +458,6 @@ function update(source, instant) {
     .on('mousemove', moveTip)
     .on('mouseout',  hideTip);
 
-  // Card rect — dimensions updated in nu.each
   ne.append('rect').attr('class', 'card').attr('rx', 10).attr('filter', 'url(#shadow)');
 
   const nu = node.merge(ne);
@@ -485,7 +468,6 @@ function update(source, instant) {
 
   nu.classed('leaf', d => !d.children && !d._children);
 
-  // Re-draw card internals on every update
   nu.each(function(d) {
     const isVirtual = d.data.uid === '__ROOT__';
     const role   = isVirtual ? 'Organization' : d.data.role;
@@ -494,27 +476,22 @@ function update(source, instant) {
     const layout = cardLayout(d);
     const sel    = d3.select(this);
 
-    // Card rect
     sel.select('.card')
       .attr('x', -NW / 2).attr('y', -ch / 2)
       .attr('width', NW).attr('height', ch);
 
-    // Remove old text + divider, re-add fresh
     sel.selectAll('text, line.name-div').remove();
 
-    // Role label
     sel.append('text').attr('class', 'role-lbl')
       .attr('y', layout.roleY)
       .text(clip(role, 18));
 
-    // Divider (multi-person only)
     if (layout.divY !== null) {
       sel.append('line').attr('class', 'name-div')
         .attr('x1', -NW / 2 + 12).attr('x2', NW / 2 - 12)
         .attr('y1', layout.divY).attr('y2', layout.divY);
     }
 
-    // Name labels
     layout.nameYs.forEach((y, i) => {
       sel.append('text').attr('class', 'name-lbl')
         .attr('y', y)
@@ -522,7 +499,6 @@ function update(source, instant) {
     });
   });
 
-  // Badges (count persons, not nodes)
   nu.selectAll('.badge').remove();
   nu.filter(d => !!d._children).each(function(d) {
     const n = totalPersonDesc(d);
@@ -550,12 +526,13 @@ function update(source, instant) {
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-// Bezier link connecting bottom of source card to top of target card
+// Connector exits the bottom of source and enters the top of target.
+// Control points at 30% of the span → gentle curve, not a tight S.
 function bezier(s, t) {
   const sy = s.y + cardH(s._d || s) / 2;
   const ty = t.y - cardH(t._d || t) / 2;
-  const my = (sy + ty) / 2;
-  return `M${s.x},${sy} C${s.x},${my} ${t.x},${my} ${t.x},${ty}`;
+  const cp = (ty - sy) * 0.3;
+  return `M${s.x},${sy} C${s.x},${sy + cp} ${t.x},${ty - cp} ${t.x},${ty}`;
 }
 
 function toggle(d) {
@@ -564,7 +541,6 @@ function toggle(d) {
   update(d);
 }
 
-// Count total persons hidden under a collapsed node
 function totalPersonDesc(node) {
   const kids = (node.children || []).concat(node._children || []);
   return kids.reduce((s, c) => s + nodePersonCount(c) + totalPersonDesc(c), 0);
