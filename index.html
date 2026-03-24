@@ -486,6 +486,7 @@ function update(source, instant) {
   treeLayout.nodeSize([maxCardW + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
   applyDepthSpacing(root);
+  compactBreadth(root);
 
   const nodes = root.descendants();
   const links = nodes.filter(d => (d.children || []).length > 0);
@@ -674,6 +675,41 @@ function applyDepthSpacing(rootNode) {
   });
 }
 
+function compactBreadth(rootNode) {
+  const levels = new Map();
+
+  rootNode.each(node => {
+    if (!levels.has(node.depth)) levels.set(node.depth, []);
+    levels.get(node.depth).push(node);
+  });
+
+  levels.forEach(nodes => {
+    nodes.sort((a, b) => a.x - b.x);
+
+    const originalLeft = Math.min(...nodes.map(node => node.x - cardW(node) / 2));
+    const originalRight = Math.max(...nodes.map(node => node.x + cardW(node) / 2));
+    const originalCenter = (originalLeft + originalRight) / 2;
+
+    let cursor = 0;
+    nodes.forEach((node, index) => {
+      const halfW = cardW(node) / 2;
+      if (index === 0) {
+        node.x = halfW;
+      } else {
+        node.x = cursor + HG + halfW;
+      }
+      cursor = node.x + halfW;
+    });
+
+    const packedLeft = Math.min(...nodes.map(node => node.x - cardW(node) / 2));
+    const packedRight = Math.max(...nodes.map(node => node.x + cardW(node) / 2));
+    const packedCenter = (packedLeft + packedRight) / 2;
+    const shift = originalCenter - packedCenter;
+
+    nodes.forEach(node => { node.x += shift; });
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  FIT VIEW
 // ═══════════════════════════════════════════════════════════════════
@@ -688,6 +724,7 @@ function fitView() {
   treeLayout.nodeSize([maxCardW + HG, NH_MIN + LEVEL_GAP]);
   treeLayout(root);
   applyDepthSpacing(root);
+  compactBreadth(root);
 
   const nodes = root.descendants();
   const x0 = Math.min(...nodes.map(d => d.x - cardW(d) / 2)) - 24;
