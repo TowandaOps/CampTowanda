@@ -130,7 +130,7 @@
 
     .name-lbl {
       font-family: 'DM Sans', sans-serif;
-      font-size: 12px;
+      font-size: 14px;
       fill: #5A8A68;
       text-anchor: middle;
       dominant-baseline: middle;
@@ -260,8 +260,8 @@ const CSV_URL =
 //  Narrower, taller cards + tight sibling gap = more vertical feel
 // ═══════════════════════════════════════════════════════════════════
 const NW  = 155;   // card width
-const NH  = 76;    // card height (taller than before)
-const HG  = 22;    // horizontal gap between siblings (tight)
+const NH  = 76;    // card height
+const HG  = 22;    // horizontal gap between siblings
 const VG  = 80;    // vertical gap between levels
 const DUR = 500;
 
@@ -434,8 +434,8 @@ function update(source, instant) {
     const role = isVirtual ? 'Organization' : d.data.id;
     const hasName = !!d.data.name && !isVirtual;
     const sel = d3.select(this);
-    sel.select('.role-lbl').attr('y', hasName ? -16 : 0).text(clip(role, 18));
-    sel.select('.name-lbl').attr('y', hasName ?  14 : 0).text(hasName ? clip(d.data.name, 21) : '');
+    sel.select('.role-lbl').attr('y', hasName ? -17 : 0).text(clip(role, 18));
+    sel.select('.name-lbl').attr('y', hasName ?  16 : 0).text(hasName ? clip(d.data.name, 21) : '');
   });
 
   // Badges
