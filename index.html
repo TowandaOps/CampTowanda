@@ -257,7 +257,6 @@ const CSV_URL =
 
 // ═══════════════════════════════════════════════════════════════════
 //  LAYOUT
-//  Narrower, taller cards + tight sibling gap = more vertical feel
 // ═══════════════════════════════════════════════════════════════════
 const NW  = 155;   // card width
 const NH  = 76;    // card height
@@ -282,31 +281,46 @@ let _uid = 0;
         return k !== undefined ? (row[k] || '').trim() : '';
       };
       return {
-        id:     get('role'),
+        role:   get('role'),
         name:   get('name'),
         parent: get('reports to') || null,
       };
     });
 
-    const seen = new Set();
-    const rows = raw.filter(r => {
-      if (!r.id || seen.has(r.id)) return false;
-      seen.add(r.id);
-      return true;
+    // Assign a unique uid to every row so duplicate role names are allowed.
+    // The first occurrence of a role keeps the role name as its uid;
+    // subsequent duplicates get role__2, role__3, etc.
+    // Parent references (by role name) always resolve to the first uid.
+    const uidCounts  = new Map(); // role → occurrence count
+    const roleToUid  = new Map(); // role → uid of first occurrence
+
+    const rows = raw
+      .filter(r => !!r.role)
+      .map(r => {
+        const n = (uidCounts.get(r.role) || 0) + 1;
+        uidCounts.set(r.role, n);
+        const uid = n === 1 ? r.role : `${r.role}__${n}`;
+        if (n === 1) roleToUid.set(r.role, uid);
+        return { ...r, uid };
+      });
+
+    if (rows.length === 0)
+      throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
+
+    // Resolve each row's parent to the first uid with that role name
+    rows.forEach(r => {
+      r.parentUid = r.parent ? (roleToUid.get(r.parent) || null) : null;
     });
-    if (rows.length === 0) throw new Error('No data found. Check that the sheet has Role / Name / Reports To columns.');
 
-    const roleSet = new Set(rows.map(r => r.id));
-    rows.forEach(r => { if (r.parent && !roleSet.has(r.parent)) r.parent = null; });
-
-    const roots = rows.filter(r => !r.parent);
-    if (roots.length === 0) throw new Error('No root found. One row must have an empty "Reports To" field.');
+    const roots = rows.filter(r => !r.parentUid);
+    if (roots.length === 0)
+      throw new Error('No root found. One row must have an empty "Reports To" field.');
     if (roots.length > 1) {
-      rows.unshift({ id: '__ROOT__', name: '', parent: null });
-      roots.forEach(r => (r.parent = '__ROOT__'));
+      rows.unshift({ role: '__ROOT__', uid: '__ROOT__', name: '', parent: null, parentUid: null });
+      roots.forEach(r => (r.parentUid = '__ROOT__'));
     }
 
-    root = d3.stratify().id(d => d.id).parentId(d => d.parent)(rows);
+    root = d3.stratify().id(d => d.uid).parentId(d => d.parentUid)(rows);
     root.each(d => { d._uid = ++_uid; });
 
     root.each(d => {
@@ -316,7 +330,7 @@ let _uid = 0;
       }
     });
 
-    const total = rows.filter(r => r.id !== '__ROOT__').length;
+    const total = rows.filter(r => r.uid !== '__ROOT__').length;
     document.getElementById('people-badge').textContent = `${total} people`;
 
     setupSVG();
@@ -430,8 +444,8 @@ function update(source, instant) {
   nu.classed('leaf', d => !d.children && !d._children);
 
   nu.each(function (d) {
-    const isVirtual = d.data.id === '__ROOT__';
-    const role = isVirtual ? 'Organization' : d.data.id;
+    const isVirtual = d.data.uid === '__ROOT__';
+    const role = isVirtual ? 'Organization' : d.data.role;
     const hasName = !!d.data.name && !isVirtual;
     const sel = d3.select(this);
     sel.select('.role-lbl').attr('y', hasName ? -17 : 0).text(clip(role, 18));
@@ -544,7 +558,7 @@ function resetView() {
 const tip = document.getElementById('tooltip');
 
 function showTip(event, d) {
-  const role = d.data.id === '__ROOT__' ? 'Organization' : d.data.id;
+  const role = d.data.uid === '__ROOT__' ? 'Organization' : d.data.role;
   const hidden = d._children ? totalDesc(d) : 0;
   let html = `<div class="tt-role">${esc(role)}</div>`;
   if (d.data.name) html += `<div class="tt-name">${esc(d.data.name)}</div>`;
