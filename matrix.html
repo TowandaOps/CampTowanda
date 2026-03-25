@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camp Towanda - Responsibility Matrix</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4efe5;
+      --surface: rgba(255, 250, 242, 0.92);
+      --surface-strong: #fffdf7;
+      --ink: #1a2a24;
+      --muted: #607167;
+      --line: #d9cfbe;
+      --accent: #c65c3d;
+      --accent-soft: rgba(198, 92, 61, 0.12);
+      --accent-strong: #8d341c;
+      --sage: #5f7c68;
+      --sage-soft: rgba(95, 124, 104, 0.12);
+      --warn: #c28b2c;
+      --shadow: 0 18px 40px rgba(60, 41, 12, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(198, 92, 61, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(95, 124, 104, 0.18), transparent 30%),
+        linear-gradient(180deg, #f8f2e8 0%, #f2ecdf 100%);
+      color: var(--ink);
+      font-family: "Manrope", sans-serif;
+    }
+
+    body {
+      padding: 28px;
+    }
+
+    .shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      border: 1px solid rgba(141, 52, 28, 0.12);
+      border-radius: 28px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,248,238,0.86)),
+        linear-gradient(120deg, rgba(198, 92, 61, 0.08), rgba(95, 124, 104, 0.08));
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -4% -40% auto;
+      width: 340px;
+      height: 340px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(198, 92, 61, 0.18), transparent 72%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.8);
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 14px 0 10px;
+      font-family: "Fraunces", serif;
+      font-size: clamp(2.2rem, 4vw, 3.9rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      max-width: 9ch;
+    }
+
+    .hero-copy {
+      max-width: 72ch;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .stat {
+      min-width: 150px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.84);
+      border: 1px solid rgba(95, 124, 104, 0.14);
+    }
+
+    .stat-label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .stat-value {
+      display: block;
+      margin-top: 6px;
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .panel {
+      padding: 18px;
+      border-radius: 24px;
+      background: var(--surface);
+      border: 1px solid rgba(95, 124, 104, 0.16);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .panel-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title {
+      font-family: "Fraunces", serif;
+      font-size: 1.4rem;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .pill,
+    .ghost-btn,
+    .filter-chip {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font: inherit;
+    }
+
+    .ghost-btn {
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.85);
+      color: var(--ink);
+      border-color: rgba(95, 124, 104, 0.18);
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    .ghost-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(198, 92, 61, 0.28);
+      background: #fff;
+    }
+
+    .ghost-btn:disabled {
+      opacity: 0.5;
+      cursor: wait;
+      transform: none;
+    }
+
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.9);
+      border-color: rgba(95, 124, 104, 0.18);
+    }
+
+    .pill-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--sage);
+      box-shadow: 0 0 0 4px rgba(95, 124, 104, 0.14);
+    }
+
+    .people-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .filter-chip {
+      padding: 10px 14px;
+      background: rgba(95, 124, 104, 0.08);
+      border-color: rgba(95, 124, 104, 0.12);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+
+    .filter-chip:hover {
+      transform: translateY(-1px);
+      border-color: rgba(198, 92, 61, 0.24);
+      background: rgba(198, 92, 61, 0.08);
+    }
+
+    .filter-chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(198, 92, 61, 0.18);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.75);
+      border: 1px solid rgba(95, 124, 104, 0.14);
+    }
+
+    .legend-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      background: var(--sage-soft);
+      border: 1px solid rgba(95, 124, 104, 0.3);
+    }
+
+    .legend-swatch.strong {
+      background: var(--accent-soft);
+      border-color: rgba(198, 92, 61, 0.4);
+    }
+
+    .matrix-shell {
+      overflow: auto;
+      border-radius: 20px;
+      border: 1px solid rgba(95, 124, 104, 0.16);
+      background: var(--surface-strong);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 860px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #fdf8ef;
+      backdrop-filter: blur(14px);
+    }
+
+    th,
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid rgba(95, 124, 104, 0.12);
+      border-right: 1px solid rgba(95, 124, 104, 0.08);
+      vertical-align: middle;
+    }
+
+    th:first-child,
+    td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #fffaf2;
+    }
+
+    thead th:first-child {
+      z-index: 4;
+    }
+
+    th.task-col {
+      min-width: 340px;
+      text-align: left;
+    }
+
+    th.person-col {
+      min-width: 132px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .person-button {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .person-button.active {
+      color: var(--accent-strong);
+    }
+
+    tbody tr {
+      transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    tbody tr.row-dim {
+      opacity: 0.38;
+    }
+
+    tbody tr.row-match {
+      background: linear-gradient(90deg, rgba(198, 92, 61, 0.10), rgba(198, 92, 61, 0.02));
+    }
+
+    tbody tr:hover {
+      background: rgba(95, 124, 104, 0.05);
+    }
+
+    .task-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .meta-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: rgba(95, 124, 104, 0.08);
+      border: 1px solid rgba(95, 124, 104, 0.1);
+    }
+
+    .meta-tag.supervision {
+      background: rgba(194, 139, 44, 0.12);
+      border-color: rgba(194, 139, 44, 0.24);
+      color: #866013;
+    }
+
+    .cell {
+      text-align: center;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .cell.is-owned {
+      background: rgba(95, 124, 104, 0.08);
+    }
+
+    .cell.is-active-person {
+      background: rgba(198, 92, 61, 0.14);
+      color: var(--accent-strong);
+      box-shadow: inset 0 0 0 1px rgba(198, 92, 61, 0.18);
+    }
+
+    .mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      background: rgba(95, 124, 104, 0.14);
+      color: #31523c;
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    .cell.is-active-person .mark {
+      background: rgba(198, 92, 61, 0.2);
+      color: var(--accent-strong);
+    }
+
+    .empty-state {
+      padding: 38px 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty-title {
+      font-family: "Fraunces", serif;
+      font-size: 1.6rem;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .error-card {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(198, 92, 61, 0.08);
+      color: var(--accent-strong);
+      border: 1px solid rgba(198, 92, 61, 0.16);
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 16px;
+      }
+
+      .hero,
+      .panel {
+        padding: 16px;
+        border-radius: 20px;
+      }
+
+      th.task-col {
+        min-width: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <span class="eyebrow">Live Leadership View</span>
+      <h1>Interactive Filtered Matrix</h1>
+      <p class="hero-copy">
+        Click a person to spotlight only the tasks they own while still preserving the full responsibility map.
+        This page reads from a Google Sheet, refreshes automatically, and supports supervision tasks in the same matrix.
+      </p>
+      <div class="summary">
+        <div class="stat">
+          <span class="stat-label">People</span>
+          <span class="stat-value" id="peopleCount">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Tasks</span>
+          <span class="stat-value" id="taskCount">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Assignments</span>
+          <span class="stat-value" id="assignmentCount">0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Filter By Person</div>
+          <div class="panel-subtitle">Selecting a person keeps the full matrix in view, but fades unrelated rows.</div>
+        </div>
+        <div class="controls">
+          <button class="ghost-btn" id="clearFilterBtn">Clear Filter</button>
+          <button class="ghost-btn" id="refreshBtn">Refresh Now</button>
+        </div>
+      </div>
+      <div class="status-row">
+        <span class="pill">
+          <span class="pill-dot" id="statusDot"></span>
+          <span id="syncStatus">Waiting for first sync</span>
+        </span>
+        <span id="lastUpdated">Not synced yet</span>
+      </div>
+      <div class="people-filter" id="peopleFilter"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Responsibility Matrix</div>
+          <div class="panel-subtitle">Rows are tasks. Columns are people. Any `X` cell means responsibility.</div>
+        </div>
+        <div class="legend">
+          <span class="legend-chip"><span class="legend-swatch"></span> Assigned task</span>
+          <span class="legend-chip"><span class="legend-swatch strong"></span> Selected person</span>
+        </div>
+      </div>
+      <div id="matrixMount" class="matrix-shell"></div>
+      <p class="footnote">
+        Default sheet format: first columns can be <strong>Task</strong>, <strong>Category</strong>, <strong>Type</strong>, or <strong>Notes</strong>.
+        Every remaining column is treated as a person. Use <strong>X</strong>, <strong>Yes</strong>, <strong>1</strong>, or <strong>TRUE</strong> to mark ownership.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const MATRIX_CONFIG = window.MATRIX_CONFIG || {
+      csvUrl: "https://docs.google.com/spreadsheets/d/1kf2O9n5ldRzHZIOuSbVH7WgiFYFxijYFSTwn7SgQbh4/gviz/tq?tqx=out:csv&gid=0",
+      refreshMs: 30000
+    };
+
+    const RESERVED_HEADERS = new Set(["task", "category", "type", "notes"]);
+    const POSITIVE_MARKERS = new Set(["x", "yes", "true", "1", "owner", "lead"]);
+
+    const state = {
+      rows: [],
+      people: [],
+      activePerson: null,
+      lastUpdatedAt: null,
+      isLoading: false,
+      error: null
+    };
+
+    const peopleCountEl = document.getElementById("peopleCount");
+    const taskCountEl = document.getElementById("taskCount");
+    const assignmentCountEl = document.getElementById("assignmentCount");
+    const peopleFilterEl = document.getElementById("peopleFilter");
+    const matrixMountEl = document.getElementById("matrixMount");
+    const syncStatusEl = document.getElementById("syncStatus");
+    const lastUpdatedEl = document.getElementById("lastUpdated");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const clearFilterBtn = document.getElementById("clearFilterBtn");
+    const statusDot = document.getElementById("statusDot");
+
+    clearFilterBtn.addEventListener("click", () => {
+      state.activePerson = null;
+      render();
+    });
+
+    refreshBtn.addEventListener("click", () => {
+      loadSheetData(true);
+    });
+
+    async function loadSheetData(isManual = false) {
+      if (!MATRIX_CONFIG.csvUrl || MATRIX_CONFIG.csvUrl.includes("PASTE_GOOGLE_SHEET_CSV_URL_HERE")) {
+        state.error = "Add your Google Sheet CSV URL in MATRIX_CONFIG.csvUrl near the bottom of matrix.html.";
+        render();
+        return;
+      }
+
+      state.isLoading = true;
+      state.error = null;
+      renderStatus(isManual ? "Refreshing from Google Sheets..." : "Syncing with Google Sheets...");
+
+      try {
+        const response = await fetch(withCacheBust(MATRIX_CONFIG.csvUrl), { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Google Sheet could not be loaded. Confirm the sheet is shared as Viewer or published as CSV.");
+        }
+
+        const csvText = await response.text();
+        const parsed = parseCsv(csvText);
+        const normalized = normalizeMatrix(parsed);
+
+        state.rows = normalized.rows;
+        state.people = normalized.people;
+        state.lastUpdatedAt = new Date();
+        state.error = null;
+
+        if (state.activePerson && !state.people.includes(state.activePerson)) {
+          state.activePerson = null;
+        }
+
+        renderStatus("Live sync connected");
+      } catch (error) {
+        console.error("[Matrix]", error);
+        state.error = error.message || "Unable to load the Google Sheet.";
+        renderStatus("Sync failed");
+      } finally {
+        state.isLoading = false;
+        render();
+      }
+    }
+
+    function withCacheBust(url) {
+      const separator = url.includes("?") ? "&" : "?";
+      return `${url}${separator}_ts=${Date.now()}`;
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let value = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            value += '"';
+            i += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+          continue;
+        }
+
+        if (char === "," && !inQuotes) {
+          row.push(value);
+          value = "";
+          continue;
+        }
+
+        if ((char === "\n" || char === "\r") && !inQuotes) {
+          if (char === "\r" && next === "\n") {
+            i += 1;
+          }
+          row.push(value);
+          if (row.some(cell => cell.trim() !== "")) {
+            rows.push(row);
+          }
+          row = [];
+          value = "";
+          continue;
+        }
+
+        value += char;
+      }
+
+      row.push(value);
+      if (row.some(cell => cell.trim() !== "")) {
+        rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function normalizeMatrix(parsedRows) {
+      if (!parsedRows.length) {
+        return { people: [], rows: [] };
+      }
+
+      const headers = parsedRows[0].map(cell => cell.trim());
+      const lowerHeaders = headers.map(header => header.toLowerCase());
+      const taskIndex = lowerHeaders.findIndex(header => header === "task");
+      const categoryIndex = lowerHeaders.findIndex(header => header === "category");
+      const typeIndex = lowerHeaders.findIndex(header => header === "type");
+      const notesIndex = lowerHeaders.findIndex(header => header === "notes");
+
+      if (taskIndex === -1) {
+        throw new Error('The sheet needs a "Task" column.');
+      }
+
+      const people = headers.filter((header, index) => header && !RESERVED_HEADERS.has(lowerHeaders[index]));
+
+      const rows = parsedRows.slice(1)
+        .map((cells, rowIndex) => {
+          const task = safeCell(cells[taskIndex]);
+          if (!task) return null;
+
+          const assignments = {};
+          let assignmentCount = 0;
+
+          people.forEach(person => {
+            const personIndex = headers.indexOf(person);
+            const marked = isPositiveMarker(safeCell(cells[personIndex]));
+            assignments[person] = marked;
+            if (marked) assignmentCount += 1;
+          });
+
+          return {
+            id: `${task}-${rowIndex}`,
+            task,
+            category: categoryIndex >= 0 ? safeCell(cells[categoryIndex]) : "",
+            type: typeIndex >= 0 ? safeCell(cells[typeIndex]) : "",
+            notes: notesIndex >= 0 ? safeCell(cells[notesIndex]) : "",
+            assignments,
+            assignmentCount
+          };
+        })
+        .filter(Boolean);
+
+      return { people, rows };
+    }
+
+    function safeCell(value) {
+      return (value || "").trim();
+    }
+
+    function isPositiveMarker(value) {
+      return POSITIVE_MARKERS.has(value.trim().toLowerCase());
+    }
+
+    function render() {
+      renderStats();
+      renderPeopleFilter();
+      renderMatrix();
+      renderTimestamp();
+      refreshBtn.disabled = state.isLoading;
+      clearFilterBtn.disabled = !state.activePerson;
+      statusDot.style.background = state.error ? "var(--accent)" : "var(--sage)";
+      statusDot.style.boxShadow = state.error
+        ? "0 0 0 4px rgba(198, 92, 61, 0.14)"
+        : "0 0 0 4px rgba(95, 124, 104, 0.14)";
+    }
+
+    function renderStats() {
+      const assignmentCount = state.rows.reduce((sum, row) => sum + row.assignmentCount, 0);
+      peopleCountEl.textContent = state.people.length;
+      taskCountEl.textContent = state.rows.length;
+      assignmentCountEl.textContent = assignmentCount;
+    }
+
+    function renderPeopleFilter() {
+      if (!state.people.length) {
+        peopleFilterEl.innerHTML = "";
+        return;
+      }
+
+      peopleFilterEl.innerHTML = state.people.map(person => `
+        <button
+          class="filter-chip ${state.activePerson === person ? "active" : ""}"
+          type="button"
+          data-person="${escapeHtml(person)}"
+        >
+          ${escapeHtml(person)}
+        </button>
+      `).join("");
+
+      peopleFilterEl.querySelectorAll("[data-person]").forEach(button => {
+        button.addEventListener("click", () => {
+          const person = button.getAttribute("data-person");
+          state.activePerson = state.activePerson === person ? null : person;
+          render();
+        });
+      });
+    }
+
+    function renderMatrix() {
+      if (state.error) {
+        matrixMountEl.innerHTML = `<div class="error-card">${escapeHtml(state.error)}</div>`;
+        return;
+      }
+
+      if (!state.rows.length || !state.people.length) {
+        matrixMountEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-title">Waiting for matrix data</div>
+            <div>Once the Google Sheet is connected, the responsibility grid will appear here.</div>
+          </div>
+        `;
+        return;
+      }
+
+      matrixMountEl.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th class="task-col">Task</th>
+              ${state.people.map(person => `
+                <th class="person-col">
+                  <button class="person-button ${state.activePerson === person ? "active" : ""}" data-header-person="${escapeHtml(person)}" type="button">
+                    ${escapeHtml(person)}
+                  </button>
+                </th>
+              `).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${state.rows.map(row => renderRow(row)).join("")}
+          </tbody>
+        </table>
+      `;
+
+      matrixMountEl.querySelectorAll("[data-header-person]").forEach(button => {
+        button.addEventListener("click", () => {
+          const person = button.getAttribute("data-header-person");
+          state.activePerson = state.activePerson === person ? null : person;
+          render();
+        });
+      });
+    }
+
+    function renderRow(row) {
+      const matchesFilter = !state.activePerson || row.assignments[state.activePerson];
+      const rowClass = state.activePerson
+        ? matchesFilter ? "row-match" : "row-dim"
+        : "";
+      const isSupervision = /supervis/i.test(row.type) || /supervis/i.test(row.category) || /supervis/i.test(row.notes);
+
+      return `
+        <tr class="${rowClass}">
+          <td>
+            <div class="task-name">${escapeHtml(row.task)}</div>
+            <div class="task-meta">
+              ${row.category ? `<span class="meta-tag">${escapeHtml(row.category)}</span>` : ""}
+              ${row.type ? `<span class="meta-tag ${isSupervision ? "supervision" : ""}">${escapeHtml(row.type)}</span>` : ""}
+              ${row.notes ? `<span class="meta-tag">${escapeHtml(row.notes)}</span>` : ""}
+              ${isSupervision && !row.type ? `<span class="meta-tag supervision">Supervision</span>` : ""}
+            </div>
+          </td>
+          ${state.people.map(person => {
+            const assigned = row.assignments[person];
+            const isActivePerson = state.activePerson === person;
+            const classes = [
+              "cell",
+              assigned ? "is-owned" : "",
+              assigned && isActivePerson ? "is-active-person" : ""
+            ].filter(Boolean).join(" ");
+
+            return `
+              <td class="${classes}">
+                ${assigned ? '<span class="mark">X</span>' : ""}
+              </td>
+            `;
+          }).join("")}
+        </tr>
+      `;
+    }
+
+    function renderStatus(message) {
+      syncStatusEl.textContent = message;
+    }
+
+    function renderTimestamp() {
+      if (!state.lastUpdatedAt) {
+        lastUpdatedEl.textContent = "Not synced yet";
+        return;
+      }
+
+      lastUpdatedEl.textContent = `Last updated ${state.lastUpdatedAt.toLocaleString()}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    render();
+    loadSheetData();
+    window.setInterval(() => loadSheetData(false), MATRIX_CONFIG.refreshMs);
+  </script>
+</body>
+</html>
